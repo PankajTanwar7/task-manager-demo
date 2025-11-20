@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const taskRoutes = require('./routes/tasks');
+const healthRoutes = require('./routes/health');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -43,17 +44,7 @@ app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
 // Routes
 app.use('/api/tasks', taskRoutes);
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'Task Manager API is running',
-    timestamp: new Date().toISOString(),
-    uptime: Math.floor(process.uptime()),
-    environment: process.env.NODE_ENV || 'development'
-  });
-});
+app.use('/health', healthRoutes);
 
 // 404 handler
 app.use((req, res) => {

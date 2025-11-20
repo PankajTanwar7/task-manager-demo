@@ -154,7 +154,7 @@ generate_prompt() {
     prompt_file=".claude-prompt-issue-${issue_num}.md"
 
     cat > "$prompt_file" << EOF
-# Claude Code Prompt - Issue #${issue_num}
+[WORKFLOW-SCRIPT] Claude Code Prompt - Issue #${issue_num}
 
 ## Context from GitHub Issue
 
