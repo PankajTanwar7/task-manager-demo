@@ -1,28 +1,26 @@
 const express = require('express');
 const router = express.Router();
 
-// Server start time for uptime calculation
-const serverStartTime = Date.now();
-
 /**
  * GET /health
  * Health check endpoint for monitoring and deployment verification
  *
  * @returns {Object} Health status information
+ * @returns {boolean} success - Always true
  * @returns {string} status - Server status (always "ok")
+ * @returns {string} message - Status message
  * @returns {number} uptime - Server uptime in seconds
  * @returns {string} timestamp - Current ISO timestamp
+ * @returns {string} environment - Current environment (development/production)
  */
 router.get('/', (req, res) => {
-  const uptimeSeconds = Math.floor(process.uptime());
-
   res.status(200).json({
     success: true,
-    data: {
-      status: 'ok',
-      uptime: uptimeSeconds,
-      timestamp: new Date().toISOString()
-    }
+    status: 'ok',
+    message: 'Task Manager API is running',
+    uptime: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
   });
 });
 

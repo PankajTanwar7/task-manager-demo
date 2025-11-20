@@ -11,3 +11,14 @@ _This file is auto-updated by Claude Code prompt logger hook_
 
 ---
 
+
+## Session: 2025-11-20 19:44:53
+**Branch:** `feature/6-add-health-check-endpoint`
+**Issue:** #6
+
+### 📝 User Prompt
+```
+Please add a README section documenting the health endpoint
+```
+
+---
