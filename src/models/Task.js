@@ -5,8 +5,9 @@ let tasks = [];
 let nextId = 1;
 
 class Task {
-  constructor(title, description) {
-    this.id = nextId++;
+  constructor(title, description, id = null) {
+    // Use provided ID or generate atomically within create method
+    this.id = id;
     this.title = title;
     this.description = description || '';
     this.completed = false;
@@ -14,7 +15,9 @@ class Task {
   }
 
   static create(title, description) {
-    const task = new Task(title, description);
+    // Generate ID atomically before creating task instance
+    const id = nextId++;
+    const task = new Task(title, description, id);
     tasks.push(task);
     return task;
   }
