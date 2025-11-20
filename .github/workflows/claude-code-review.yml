@@ -39,19 +39,34 @@ jobs:
       - name: Check PR size
         id: pr-size
         run: |
-          FILES=$(gh pr view ${{ github.event.pull_request.number }} --json files -q '.files | length')
-          ADDITIONS=$(gh pr view ${{ github.event.pull_request.number }} --json additions -q '.additions')
-          echo "files=$FILES" >> $GITHUB_OUTPUT
-          echo "additions=$ADDITIONS" >> $GITHUB_OUTPUT
+          # Get total stats
+          TOTAL_FILES=$(gh pr view ${{ github.event.pull_request.number }} --json files -q '.files | length')
+          TOTAL_ADDITIONS=$(gh pr view ${{ github.event.pull_request.number }} --json additions -q '.additions')
 
-          if [ "$FILES" -gt 50 ]; then
-            echo "⚠️ Large PR detected: $FILES files changed"
+          # Count only reviewable files (exclude lock files, generated files)
+          REVIEWABLE_FILES=$(gh pr view ${{ github.event.pull_request.number }} --json files -q '.files[] | select(
+            .path | test("(package-lock\\.json|yarn\\.lock|pnpm-lock\\.yaml|\\.min\\.js|\\.bundle\\.js)$") | not
+          ) | .path' | wc -l)
+
+          # Count additions in reviewable files only
+          REVIEWABLE_ADDITIONS=$(gh pr view ${{ github.event.pull_request.number }} --json files -q '.files[] | select(
+            .path | test("(package-lock\\.json|yarn\\.lock|pnpm-lock\\.yaml|\\.min\\.js|\\.bundle\\.js)$") | not
+          ) | .additions' | awk '{sum+=$1} END {print sum}')
+
+          echo "total_files=$TOTAL_FILES" >> $GITHUB_OUTPUT
+          echo "total_additions=$TOTAL_ADDITIONS" >> $GITHUB_OUTPUT
+          echo "reviewable_files=$REVIEWABLE_FILES" >> $GITHUB_OUTPUT
+          echo "reviewable_additions=$REVIEWABLE_ADDITIONS" >> $GITHUB_OUTPUT
+
+          # Check reviewable size (not total size)
+          if [ "$REVIEWABLE_FILES" -gt 50 ]; then
+            echo "⚠️ Large PR detected: $REVIEWABLE_FILES reviewable files changed"
             echo "skip=true" >> $GITHUB_OUTPUT
-          elif [ "$ADDITIONS" -gt 1000 ]; then
-            echo "⚠️ Large PR detected: $ADDITIONS lines added"
+          elif [ "$REVIEWABLE_ADDITIONS" -gt 1000 ]; then
+            echo "⚠️ Large PR detected: $REVIEWABLE_ADDITIONS reviewable lines added"
             echo "skip=true" >> $GITHUB_OUTPUT
           else
-            echo "✓ PR size acceptable for review"
+            echo "✓ PR size acceptable for review: $REVIEWABLE_FILES files, $REVIEWABLE_ADDITIONS lines (excluding lock files)"
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
         env:
@@ -60,7 +75,7 @@ jobs:
       - name: Comment if PR too large
         if: steps.pr-size.outputs.skip == 'true'
         run: |
-          gh pr comment ${{ github.event.pull_request.number }} --body "ℹ️ This PR is quite large (${{ steps.pr-size.outputs.files }} files, ${{ steps.pr-size.outputs.additions }}+ lines). Automatic review is skipped. Consider:
+          gh pr comment ${{ github.event.pull_request.number }} --body "ℹ️ This PR is quite large (${{ steps.pr-size.outputs.reviewable_files }} reviewable files, ${{ steps.pr-size.outputs.reviewable_additions }}+ lines). Automatic review is skipped. Consider:
           - Breaking into smaller PRs
           - Requesting manual @claude review for specific files
           - Tagging @claude with specific questions"
