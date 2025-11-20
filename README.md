@@ -1,445 +1,283 @@
-# 🚀 Ultimate Development Workflow System
+# Task Manager API
 
-**Combining GitHub @claude + Claude Code + Auto Logging for Maximum Productivity**
+A simple RESTful API for managing tasks, built with Express.js and in-memory storage.
 
----
+## Features
 
-## 📖 What is This?
+- Create, read, update, and delete tasks
+- Input validation with express-validator
+- Comprehensive test coverage with Jest
+- CORS enabled for cross-origin requests
+- Centralized error handling
+- Health check endpoint
 
-This is a complete workflow system that integrates:
+## Getting Started
 
-1. **GitHub @claude** - For planning, architecture discussions, and code reviews
-2. **Claude Code** - For implementation, testing, and git operations
-3. **Auto Prompt Logger** - For automatic documentation of development sessions
+### Prerequisites
 
-The result: **Perfect documentation with zero manual effort** ✨
+- Node.js (v14 or higher)
+- npm
 
----
-
-## 🎯 Key Features
-
-- ✅ **Automatic session logging** - Every important conversation saved to `docs/dev-logs/`
-- ✅ **GitHub issue templates** - Optimized for @claude collaboration
-- ✅ **Helper scripts** - One command to start work on any issue
-- ✅ **Smart filtering** - Only logs technically relevant conversations
-- ✅ **Git integration** - Logs linked to branches and commits
-- ✅ **Zero configuration** - Works out of the box
-
----
-
-## 📦 What's Included
-
-```
-workflow-system/
-├── .claude/
-│   └── hooks/
-│       └── prompt-logger.js          # Auto-logging hook
-├── .github/
-│   └── ISSUE_TEMPLATE/
-│       ├── feature.md                # Feature template
-│       └── bug.md                    # Bug template
-├── scripts/
-│   └── start-work.sh                 # Helper script
-├── docs/
-│   └── dev-logs/                     # Auto-generated logs go here
-│       └── README.md                 # Log index
-├── WORKFLOW.md                       # Complete workflow guide
-├── QUICKREF.md                       # Quick reference
-└── README.md                         # This file
-```
-
----
-
-## ⚡ Quick Start
-
-### 1. Copy to Your Project
+### Installation
 
 ```bash
-# Navigate to your project
-cd ~/your-project
-
-# Copy workflow system
-cp -r ~/workflow-system/.claude .
-cp -r ~/workflow-system/.github .
-cp -r ~/workflow-system/scripts .
-cp ~/workflow-system/WORKFLOW.md .
-cp ~/workflow-system/QUICKREF.md .
-
-# Create logs directory
-mkdir -p docs/dev-logs
+# Install dependencies
+npm install
 ```
 
-### 2. Install Prerequisites
+### Environment Configuration
+
+Copy `.env.example` to `.env` and adjust values as needed:
 
 ```bash
-# Install GitHub CLI (if not already installed)
-# macOS:
-brew install gh
-
-# Linux:
-sudo apt install gh
-
-# Windows:
-winget install GitHub.cli
-
-# Install jq (for helper scripts)
-sudo apt install jq  # Linux
-brew install jq      # macOS
-
-# Authenticate with GitHub
-gh auth login
+cp .env.example .env
 ```
 
-### 3. Configure Claude Code Hook
+### Running the Application
 
-**Option A: Manual Configuration**
+```bash
+# Development mode with auto-reload
+npm run dev
 
-Edit `~/.config/claude-code/config.json`:
+# Production mode
+npm start
+```
 
+The API will be available at `http://localhost:3000`
+
+### Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run tests with coverage
+npm run test:coverage
+```
+
+## API Endpoints
+
+### Health Check
+
+```
+GET /health
+```
+
+Returns the API health status.
+
+**Response:**
 ```json
 {
-  "hooks": {
-    "post-response": "node .claude/hooks/prompt-logger.js"
+  "success": true,
+  "message": "Task Manager API is running"
+}
+```
+
+### Create Task
+
+```
+POST /api/tasks
+```
+
+Create a new task.
+
+**Request Body:**
+```json
+{
+  "title": "Task title (required, 1-200 characters)",
+  "description": "Task description (optional, max 1000 characters)"
+}
+```
+
+**Response (201):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "title": "Task title",
+    "description": "Task description",
+    "completed": false,
+    "createdAt": "2025-11-21T10:30:00.000Z"
   }
 }
 ```
 
-**Option B: Automatic Configuration** (if Claude Code supports it)
-
-```bash
-claude-code config set hooks.post-response "node .claude/hooks/prompt-logger.js"
-```
-
-### 4. Test the Setup
-
-```bash
-# Test the prompt logger
-echo '{"userPrompt":"Implement user authentication feature", "claudeResponse":"Here is the implementation with JWT tokens..."}' | node .claude/hooks/prompt-logger.js
-
-# Should output:
-# ✅ Logged to: docs/dev-logs/session-2025-11-20.md
-
-# Test the helper script
-./scripts/start-work.sh --help
-```
-
----
-
-## 🎓 How to Use
-
-### Basic Workflow
+### Get All Tasks
 
 ```
-1. Create GitHub Issue → 2. Discuss with @claude → 3. Implement with Claude Code → 4. Auto-logged → 5. Create PR → 6. Review with @claude → 7. Merge
+GET /api/tasks
 ```
 
-### Detailed Steps
+Retrieve all tasks.
 
-1. **Plan in GitHub Issue**
-   - Create issue using template
-   - Tag @claude for architecture discussion
-   - Document decisions in issue
-
-2. **Start Work**
-   ```bash
-   ./scripts/start-work.sh 45  # Issue number
-   ```
-
-3. **Implement in Claude Code**
-   - Use generated prompt (includes all context from issue)
-   - Claude Code implements, tests, commits
-   - **Hook automatically logs session to `docs/dev-logs/issue-45.md`**
-
-4. **Create Pull Request**
-   ```bash
-   gh pr create --fill
-   ```
-
-5. **Review with @claude**
-   - Tag @claude in PR comments
-   - Apply feedback in Claude Code
-   - Logs updated automatically
-
-6. **Merge**
-   - PR merge auto-closes issue
-   - Development log preserved for future reference
-
----
-
-## 📚 Documentation
-
-- **[WORKFLOW.md](WORKFLOW.md)** - Complete guide with step-by-step example
-- **[QUICKREF.md](QUICKREF.md)** - Copy-paste commands for daily use
-
----
-
-## 🎯 Examples
-
-### Example 1: Quick Feature
-
-```bash
-# 1. Create issue on GitHub (issue #45)
-# 2. Start work
-./scripts/start-work.sh 45
-
-# 3. Claude Code implements (copies generated prompt)
-# 4. Automatic log created: docs/dev-logs/issue-45.md
-# 5. Create PR
-gh pr create --fill
-
-# 6. Merge
-gh pr merge
-```
-
-### Example 2: Bug Fix
-
-```bash
-# 1. Bug reported in issue #78
-# 2. Discuss with @claude in issue
-# 3. Start work
-./scripts/start-work.sh 78
-
-# 4. Claude Code fixes bug (auto-logged)
-# 5. Create PR with fix
-gh pr create --fill
-
-# 6. Merge
-```
-
-### Example 3: Complex Feature with Review
-
-```bash
-# 1. Create issue #92
-# 2. Architecture discussion with @claude
-# 3. Start implementation
-./scripts/start-work.sh 92
-
-# 4. Implement phase 1 (auto-logged)
-# 5. Create PR
-gh pr create --fill
-
-# 6. @claude reviews PR, suggests changes
-# 7. Apply changes in Claude Code (auto-logged)
-# 8. Merge PR
-
-# Result: Complete history in docs/dev-logs/issue-92.md
-```
-
----
-
-## 🔧 Configuration
-
-### Customize Prompt Logger
-
-Edit `.claude/hooks/prompt-logger.js`:
-
-```javascript
-const CONFIG = {
-  // Minimum prompt length to log
-  minPromptLength: 50,
-
-  // Add your technical keywords
-  technicalKeywords: [
-    'implement', 'create', 'add', 'fix', 'bug',
-    // Add more...
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "title": "Task title",
+      "description": "Task description",
+      "completed": false,
+      "createdAt": "2025-11-21T10:30:00.000Z"
+    }
   ],
-
-  // Add keywords to ignore
-  ignoreKeywords: [
-    'hello', 'hi', 'thanks',
-    // Add more...
-  ]
-};
+  "count": 1
+}
 ```
 
-### Customize Issue Templates
+### Get Single Task
 
-Edit `.github/ISSUE_TEMPLATE/feature.md` or `bug.md` to match your team's needs.
+```
+GET /api/tasks/:id
+```
 
-### Customize Helper Script
+Retrieve a specific task by ID.
 
-Edit `scripts/start-work.sh` to add project-specific setup steps.
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "title": "Task title",
+    "description": "Task description",
+    "completed": false,
+    "createdAt": "2025-11-21T10:30:00.000Z"
+  }
+}
+```
 
----
+**Response (404):**
+```json
+{
+  "success": false,
+  "error": "Task not found"
+}
+```
 
-## 🤔 FAQ
+### Update Task
 
-### Q: Does the hook slow down Claude Code?
+```
+PUT /api/tasks/:id
+```
 
-No, the hook runs after Claude responds, not before. It doesn't affect response time.
+Update an existing task.
 
-### Q: Can I use this without GitHub @claude?
+**Request Body:**
+```json
+{
+  "title": "Updated title (optional)",
+  "description": "Updated description (optional)",
+  "completed": true
+}
+```
 
-Yes! The workflow works with just Claude Code. You'll miss out on team collaboration features, but auto-logging still works.
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "title": "Updated title",
+    "description": "Updated description",
+    "completed": true,
+    "createdAt": "2025-11-21T10:30:00.000Z"
+  }
+}
+```
 
-### Q: What if I don't want certain sessions logged?
+### Delete Task
 
-The hook automatically filters out casual conversations. For manual control, you can disable the hook temporarily by removing it from config.
+```
+DELETE /api/tasks/:id
+```
 
-### Q: Can I view session history in Claude Code?
+Delete a task.
 
-Claude Code stores its own history separately. The hook creates an additional project-specific log in `docs/dev-logs/`.
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Task deleted successfully"
+}
+```
 
-### Q: Does this work with private repositories?
+## Project Structure
 
-Yes! All tools (GitHub CLI, Claude Code, hooks) work with private repos.
+```
+task-manager-demo/
+├── src/
+│   ├── models/
+│   │   └── Task.js              # Task model and data operations
+│   ├── controllers/
+│   │   └── taskController.js    # Request handlers
+│   ├── middleware/
+│   │   ├── validation.js        # Input validation middleware
+│   │   └── errorHandler.js      # Global error handler
+│   ├── routes/
+│   │   └── tasks.js             # API route definitions
+│   ├── app.js                   # Express app configuration
+│   └── server.js                # Application entry point
+├── tests/
+│   └── tasks.test.js            # API tests
+├── .env.example                 # Environment variables template
+├── .gitignore                   # Git ignore rules
+├── package.json                 # Project dependencies
+└── README.md                    # This file
+```
 
-### Q: Can multiple developers use this on the same project?
+## Architecture
 
-Yes! Each developer's Claude Code sessions are logged to the shared `docs/dev-logs/` directory, creating a complete team history.
+The application follows a layered architecture:
 
----
+1. **Routes** (`src/routes/`) - Define API endpoints and apply middleware
+2. **Middleware** (`src/middleware/`) - Validation and error handling
+3. **Controllers** (`src/controllers/`) - Handle requests and responses
+4. **Models** (`src/models/`) - Data operations and business logic
 
-## 🐛 Troubleshooting
+## Error Handling
 
-### Hook Not Logging
+All errors are handled by the centralized error handler middleware:
+
+- **400** - Validation errors (invalid input)
+- **404** - Resource not found
+- **500** - Internal server errors
+
+Error responses follow this format:
+
+```json
+{
+  "success": false,
+  "error": "Error message",
+  "details": [] // Only for validation errors
+}
+```
+
+## Input Validation
+
+Input validation is performed using express-validator:
+
+- **Title**: Required, 1-200 characters
+- **Description**: Optional, max 1000 characters
+- **Completed**: Boolean (true/false)
+
+## Testing
+
+The project uses Jest and Supertest for testing:
+
+- Unit tests for all API endpoints
+- Test coverage for happy paths and error cases
+- Automatic database reset between tests
+
+Run tests with:
 
 ```bash
-# Check hook is executable
-chmod +x .claude/hooks/prompt-logger.js
-
-# Check Node.js installed
-node --version  # Need v14+
-
-# Test manually
-echo '{"userPrompt":"test implement feature", "claudeResponse":"test response"}' | node .claude/hooks/prompt-logger.js
+npm test
 ```
 
-### Helper Script Fails
+## License
 
-```bash
-# Install missing dependencies
-sudo apt install gh jq  # Linux
-brew install gh jq      # macOS
-
-# Authenticate with GitHub
-gh auth login
-```
-
-### @claude Not Responding
-
-- Verify GitHub @claude integration is enabled for your org/repo
-- Check spelling: must be exactly `@claude`
-- Contact GitHub support if not available
-
----
-
-## 📈 Benefits
-
-### For Individual Developers
-
-- ✅ Never lose context between sessions
-- ✅ Perfect documentation without effort
-- ✅ Easy debugging with full history
-- ✅ Learn from past decisions
-
-### For Teams
-
-- ✅ Complete project history
-- ✅ Easy onboarding for new developers
-- ✅ Code review with AI assistance
-- ✅ Consistent workflow across team
-
-### For Projects
-
-- ✅ Architecture decisions documented
-- ✅ Implementation details preserved
-- ✅ Bug fix history tracked
-- ✅ Knowledge base builds automatically
-
----
-
-## 🚀 Advanced Usage
-
-### CI/CD Integration
-
-Add log checking to CI:
-
-```yaml
-# .github/workflows/check-logs.yml
-name: Check Development Logs
-
-on: [pull_request]
-
-jobs:
-  check-logs:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Verify log exists
-        run: |
-          ISSUE_NUM=$(echo "${{ github.head_ref }}" | grep -oP '\d+')
-          if [ ! -f "docs/dev-logs/issue-${ISSUE_NUM}.md" ]; then
-            echo "Warning: No development log found for issue #${ISSUE_NUM}"
-          fi
-```
-
-### Automated Reporting
-
-Generate weekly report:
-
-```bash
-# scripts/generate-weekly-report.sh
-#!/bin/bash
-find docs/dev-logs -name "*.md" -mtime -7 | while read log; do
-  echo "## $(basename $log)"
-  grep "^## Session:" "$log" | wc -l
-  echo "---"
-done
-```
-
-### Custom Metrics
-
-Extract metrics from logs:
-
-```bash
-# Count sessions this month
-find docs/dev-logs -name "*.md" -mtime -30 | xargs grep "^## Session:" | wc -l
-
-# List most active issues
-grep -r "**Issue:**" docs/dev-logs/ | cut -d'#' -f2 | sort | uniq -c | sort -nr
-```
-
----
-
-## 🤝 Contributing
-
-Found a bug or have a suggestion? This is your personal workflow system - customize it to your needs!
-
-Ideas for improvements:
-- Add more language-specific templates
-- Create hooks for other events
-- Build visualization dashboard for logs
-- Add AI-powered log analysis
-
----
-
-## 📄 License
-
-MIT License - Feel free to use and modify for your projects!
-
----
-
-## 🎉 Get Started Now!
-
-```bash
-# 1. Copy to your project
-cp -r ~/workflow-system/.claude ~/your-project/
-cp -r ~/workflow-system/.github ~/your-project/
-cp -r ~/workflow-system/scripts ~/your-project/
-mkdir -p ~/your-project/docs/dev-logs
-
-# 2. Configure Claude Code hook (see Quick Start)
-
-# 3. Create your first issue on GitHub
-
-# 4. Start working
-cd ~/your-project
-./scripts/start-work.sh <issue-number>
-
-# 5. Watch the magic happen! ✨
-```
-
----
-
-**Questions? Check [WORKFLOW.md](WORKFLOW.md) for the complete guide!**
+MIT
