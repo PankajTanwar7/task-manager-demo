@@ -1,6 +1,32 @@
+/**
+ * Task Controller
+ *
+ * Handles HTTP request/response logic for task operations.
+ * Delegates business logic to the Task model and ensures consistent
+ * error handling through Express middleware.
+ *
+ * All controller methods follow the pattern:
+ * - Extract data from req (body, params, query)
+ * - Call Task model methods
+ * - Return JSON response with success/error format
+ * - Pass errors to next() for centralized error handling
+ *
+ * @module controllers/taskController
+ */
+
 const Task = require('../models/Task');
 
-// Create a new task
+/**
+ * Create a new task
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} req.body - Request body
+ * @param {string} req.body.title - Task title (validated by middleware)
+ * @param {string} [req.body.description] - Task description (optional)
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ * @returns {void} Sends 201 JSON response with created task
+ */
 exports.createTask = (req, res, next) => {
   try {
     const { title, description } = req.body;
@@ -16,7 +42,14 @@ exports.createTask = (req, res, next) => {
   }
 };
 
-// Get all tasks
+/**
+ * Get all tasks
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ * @returns {void} Sends 200 JSON response with array of all tasks
+ */
 exports.getAllTasks = (req, res, next) => {
   try {
     const tasks = Task.findAll();
@@ -31,7 +64,16 @@ exports.getAllTasks = (req, res, next) => {
   }
 };
 
-// Get a single task by ID
+/**
+ * Get a single task by ID
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} req.params - Route parameters
+ * @param {string} req.params.id - Task ID (validated by middleware)
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ * @returns {void} Sends 200 JSON response with task or 404 if not found
+ */
 exports.getTaskById = (req, res, next) => {
   try {
     const task = Task.findById(req.params.id);
@@ -52,7 +94,22 @@ exports.getTaskById = (req, res, next) => {
   }
 };
 
-// Update a task
+/**
+ * Update a task
+ *
+ * Supports partial updates - only provided fields will be updated.
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} req.params - Route parameters
+ * @param {string} req.params.id - Task ID (validated by middleware)
+ * @param {Object} req.body - Request body
+ * @param {string} [req.body.title] - New task title
+ * @param {string} [req.body.description] - New task description
+ * @param {boolean} [req.body.completed] - New completion status
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ * @returns {void} Sends 200 JSON response with updated task or 404 if not found
+ */
 exports.updateTask = (req, res, next) => {
   try {
     const { title, description, completed } = req.body;
@@ -75,7 +132,18 @@ exports.updateTask = (req, res, next) => {
   }
 };
 
-// Delete a task
+/**
+ * Delete a task
+ *
+ * Permanently removes a task from the system.
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} req.params - Route parameters
+ * @param {string} req.params.id - Task ID (validated by middleware)
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ * @returns {void} Sends 200 JSON response on success or 404 if not found
+ */
 exports.deleteTask = (req, res, next) => {
   try {
     const deleted = Task.delete(req.params.id);
