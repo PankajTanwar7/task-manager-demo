@@ -44,14 +44,18 @@ app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 // Routes
 app.use('/api/tasks', taskRoutes);
 
-// Health check endpoint
+// Health check endpoint with system metrics
 app.get('/health', (req, res) => {
+  const systemMetrics = require('./utils/systemMetrics');
+  const metrics = systemMetrics.getSystemMetrics();
+
   res.status(200).json({
     success: true,
     message: 'Task Manager API is running',
     timestamp: new Date().toISOString(),
     uptime: Math.floor(process.uptime()),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    system: metrics
   });
 });
 
