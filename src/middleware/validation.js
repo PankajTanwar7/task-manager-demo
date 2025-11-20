@@ -68,6 +68,15 @@ exports.validateUpdateTask = [
       });
     }
 
+    // Check if at least one field is provided for update
+    const { title, description, completed } = req.body;
+    if (title === undefined && description === undefined && completed === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: 'At least one field (title, description, or completed) must be provided for update'
+      });
+    }
+
     next();
   }
 ];

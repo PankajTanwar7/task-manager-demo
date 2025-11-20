@@ -148,6 +148,18 @@ describe('Task API Endpoints', () => {
       expect(res.statusCode).toBe(404);
       expect(res.body.success).toBe(false);
     });
+
+    it('should return 400 when update body is empty', async () => {
+      const task = Task.create('Test Task', 'Description');
+
+      const res = await request(app)
+        .put(`/api/tasks/${task.id}`)
+        .send({});
+
+      expect(res.statusCode).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toContain('At least one field');
+    });
   });
 
   describe('DELETE /api/tasks/:id', () => {

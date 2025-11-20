@@ -34,9 +34,14 @@ app.use('/api/tasks', taskRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
+  const Task = require('./models/Task');
   res.status(200).json({
     success: true,
-    message: 'Task Manager API is running'
+    message: 'Task Manager API is running',
+    timestamp: new Date().toISOString(),
+    uptime: Math.floor(process.uptime()),
+    environment: process.env.NODE_ENV || 'development',
+    tasksCount: Task.findAll().length
   });
 });
 

@@ -260,9 +260,11 @@ Error responses follow this format:
 
 Input validation is performed using express-validator:
 
-- **Title**: Required, 1-200 characters
-- **Description**: Optional, max 1000 characters
-- **Completed**: Boolean (true/false)
+- **Title**: Required, 1-200 characters (HTML content is sanitized for security)
+- **Description**: Optional, max 1000 characters (HTML content is sanitized for security)
+- **Completed**: Boolean (true/false, accepts string values like "true"/"false")
+
+**Note:** All text inputs are automatically sanitized to prevent XSS attacks. HTML tags and potentially malicious scripts will be removed from titles and descriptions.
 
 ## Testing
 

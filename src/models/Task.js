@@ -12,6 +12,7 @@ class Task {
     this.description = description || '';
     this.completed = false;
     this.createdAt = new Date().toISOString();
+    this.updatedAt = new Date().toISOString();
   }
 
   static create(title, description) {
@@ -27,7 +28,8 @@ class Task {
   }
 
   static findById(id) {
-    return tasks.find(task => task.id === parseInt(id));
+    // ID is already converted to int by validation middleware
+    return tasks.find(task => task.id === id);
   }
 
   static update(id, updates) {
@@ -38,11 +40,15 @@ class Task {
     if (updates.description !== undefined) task.description = updates.description;
     if (updates.completed !== undefined) task.completed = updates.completed;
 
+    // Update timestamp
+    task.updatedAt = new Date().toISOString();
+
     return task;
   }
 
   static delete(id) {
-    const index = tasks.findIndex(task => task.id === parseInt(id));
+    // ID is already converted to int by validation middleware
+    const index = tasks.findIndex(task => task.id === id);
     if (index === -1) return false;
 
     tasks.splice(index, 1);
