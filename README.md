@@ -109,7 +109,8 @@ Create a new task.
     "title": "Task title",
     "description": "Task description",
     "completed": false,
-    "createdAt": "2025-11-21T10:30:00.000Z"
+    "createdAt": "2025-11-21T10:30:00.000Z",
+    "updatedAt": "2025-11-21T10:30:00.000Z"
   }
 }
 ```
@@ -132,7 +133,8 @@ Retrieve all tasks.
       "title": "Task title",
       "description": "Task description",
       "completed": false,
-      "createdAt": "2025-11-21T10:30:00.000Z"
+      "createdAt": "2025-11-21T10:30:00.000Z",
+      "updatedAt": "2025-11-21T10:30:00.000Z"
     }
   ],
   "count": 1
@@ -156,7 +158,8 @@ Retrieve a specific task by ID.
     "title": "Task title",
     "description": "Task description",
     "completed": false,
-    "createdAt": "2025-11-21T10:30:00.000Z"
+    "createdAt": "2025-11-21T10:30:00.000Z",
+    "updatedAt": "2025-11-21T10:30:00.000Z"
   }
 }
 ```
@@ -195,7 +198,8 @@ Update an existing task.
     "title": "Updated title",
     "description": "Updated description",
     "completed": true,
-    "createdAt": "2025-11-21T10:30:00.000Z"
+    "createdAt": "2025-11-21T10:30:00.000Z",
+    "updatedAt": "2025-11-21T10:35:00.000Z"
   }
 }
 ```

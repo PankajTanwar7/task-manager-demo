@@ -1,6 +1,15 @@
+const logger = require('../utils/logger');
+
 // Global error handler middleware
 const errorHandler = (err, req, res, next) => {
-  console.error('Error:', err);
+  // Log error with proper structure
+  logger.error('API Error', {
+    message: err.message,
+    stack: err.stack,
+    statusCode: err.statusCode,
+    url: req.url,
+    method: req.method
+  });
 
   const statusCode = err.statusCode || 500;
 

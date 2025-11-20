@@ -27,7 +27,10 @@ app.use('/api/', limiter);
 // CORS configuration with environment-based origins
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production'
-    ? (process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [])
+    ? (process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()) : (() => {
+        console.error('ERROR: ALLOWED_ORIGINS is required in production but not set');
+        process.exit(1);
+      })())
     : '*', // Allow all origins in development
   credentials: true,
   optionsSuccessStatus: 200
@@ -35,8 +38,8 @@ const corsOptions = {
 
 // Body parsing middleware
 app.use(cors(corsOptions));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10kb' })); // Prevent large payload DoS
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
 // Routes
 app.use('/api/tasks', taskRoutes);
