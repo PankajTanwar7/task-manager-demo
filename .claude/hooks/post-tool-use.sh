@@ -2,7 +2,7 @@
 
 # Hook: post-tool-use
 # Triggers: After each tool execution
-# Purpose: Post PR comments summarizing Claude Code sessions
+# Purpose: Post GitHub comments (Issue + PR) summarizing Claude Code sessions
 
-# Execute the PR commenter
-node "$(dirname "$0")/pr-commenter.js" "$@"
+# Execute the GitHub commenter
+node "$(dirname "$0")/github-commenter.js" "$@"

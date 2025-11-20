@@ -72,3 +72,5 @@ For complete setup and customization guide, see:
 ---
 
 *This directory is managed by Claude Code hooks. Logs are auto-generated and should not be manually edited.*
+- [2025-11-20T19:00:03.490Z] [session-2025-11-20.md](./session-2025-11-20.md) - Branch: `test/demo-hooks`
+- [2025-11-20T19:08:31.068Z] [issue-4.md](./issue-4.md) - Branch: `feature/4-health-metrics`
