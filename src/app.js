@@ -24,8 +24,17 @@ const limiter = rateLimit({
 
 app.use('/api/', limiter);
 
+// CORS configuration with environment-based origins
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production'
+    ? (process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [])
+    : '*', // Allow all origins in development
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
 // Body parsing middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -34,14 +43,12 @@ app.use('/api/tasks', taskRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  const Task = require('./models/Task');
   res.status(200).json({
     success: true,
     message: 'Task Manager API is running',
     timestamp: new Date().toISOString(),
     uptime: Math.floor(process.uptime()),
-    environment: process.env.NODE_ENV || 'development',
-    tasksCount: Task.findAll().length
+    environment: process.env.NODE_ENV || 'development'
   });
 });
 

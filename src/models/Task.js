@@ -1,5 +1,9 @@
 // Task Model - In-Memory Storage
 // This can be easily replaced with a database later
+//
+// Note: Using module-level variables for in-memory storage.
+// This is acceptable for demo purposes as Node.js JavaScript execution is single-threaded.
+// When migrating to a database, proper transaction handling will ensure thread-safety.
 
 let tasks = [];
 let nextId = 1;
@@ -11,8 +15,10 @@ class Task {
     this.title = title;
     this.description = description || '';
     this.completed = false;
-    this.createdAt = new Date().toISOString();
-    this.updatedAt = new Date().toISOString();
+    // Use single timestamp for consistency
+    const now = new Date().toISOString();
+    this.createdAt = now;
+    this.updatedAt = now;
   }
 
   static create(title, description) {

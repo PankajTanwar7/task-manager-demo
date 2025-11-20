@@ -7,7 +7,8 @@ A simple RESTful API for managing tasks, built with Express.js and in-memory sto
 - Create, read, update, and delete tasks
 - Input validation with express-validator
 - Comprehensive test coverage with Jest
-- CORS enabled for cross-origin requests
+- CORS with configurable allowed origins
+- Security middleware (Helmet, rate limiting, XSS protection)
 - Centralized error handling
 - Health check endpoint
 
@@ -32,6 +33,13 @@ Copy `.env.example` to `.env` and adjust values as needed:
 ```bash
 cp .env.example .env
 ```
+
+**Environment Variables:**
+- `PORT` - Server port (default: 3000)
+- `NODE_ENV` - Environment mode (development/production)
+- `ALLOWED_ORIGINS` - Comma-separated list of allowed CORS origins (production only)
+  - Example: `http://localhost:3000,https://example.com`
+  - In development, all origins are allowed by default
 
 ### Running the Application
 
@@ -69,7 +77,10 @@ Returns the API health status.
 ```json
 {
   "success": true,
-  "message": "Task Manager API is running"
+  "message": "Task Manager API is running",
+  "timestamp": "2025-11-21T10:30:00.000Z",
+  "uptime": 120,
+  "environment": "development"
 }
 ```
 
