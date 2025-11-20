@@ -56,7 +56,7 @@ const CONFIG = {
  * Check if conversation is technically relevant
  */
 function isRelevantConversation(userPrompt, claudeResponse) {
-  const combined = (userPrompt + ' ' + claudeResponse).toLowerCase();
+  const combined = (userPrompt + ' ' + (claudeResponse || '')).toLowerCase();
 
   // Too short = probably trivial
   if (userPrompt.length < CONFIG.minPromptLength) {
@@ -76,13 +76,25 @@ function isRelevantConversation(userPrompt, claudeResponse) {
     return true;
   }
 
-  // Contains code blocks = important
-  if (claudeResponse.includes('```') || claudeResponse.includes('`')) {
+  // For UserPromptSubmit (no response yet), check prompt only
+  if (!claudeResponse) {
+    // Log if it contains file extensions
+    if (userPrompt.match(/\b\w+\.(js|py|ts|jsx|tsx|java|go|rs|cpp|h|css|html|json|yaml|yml|md)\b/)) {
+      return true;
+    }
+    // Log if it mentions actions
+    if (userPrompt.match(/\b(write|read|create|update|delete|modify|change|add|remove|fix|debug|test|deploy)\b/i)) {
+      return true;
+    }
+  }
+
+  // Contains code blocks = important (only if response exists)
+  if (claudeResponse && (claudeResponse.includes('```') || claudeResponse.includes('`'))) {
     return true;
   }
 
   // Modified files mentioned = important
-  if (claudeResponse.match(/\b\w+\.(js|py|ts|jsx|tsx|java|go|rs|cpp|h|css|html)\b/)) {
+  if (combined.match(/\b\w+\.(js|py|ts|jsx|tsx|java|go|rs|cpp|h|css|html)\b/)) {
     return true;
   }
 
@@ -133,7 +145,7 @@ function getModifiedFiles() {
 function formatLogEntry(data) {
   const { userPrompt, claudeResponse, gitContext, modifiedFiles, timestamp } = data;
 
-  const entry = `
+  let entry = `
 ## Session: ${timestamp}
 **Branch:** \`${gitContext.branch}\`
 ${gitContext.issueNumber ? `**Issue:** #${gitContext.issueNumber}` : ''}
@@ -142,14 +154,25 @@ ${gitContext.issueNumber ? `**Issue:** #${gitContext.issueNumber}` : ''}
 \`\`\`
 ${userPrompt.trim()}
 \`\`\`
+`;
 
+  // Only add response section if we have a response
+  if (claudeResponse) {
+    entry += `
 ### 🤖 Claude Response Summary
 ${extractSummary(claudeResponse)}
+`;
+  }
 
-${modifiedFiles.length > 0 ? `### 📁 Files Modified
+  // Add modified files if any
+  if (modifiedFiles.length > 0) {
+    entry += `
+### 📁 Files Modified
 ${modifiedFiles.map(f => `- ${f}`).join('\n')}
-` : ''}
+`;
+  }
 
+  entry += `
 ---
 `;
 
@@ -247,22 +270,39 @@ This directory contains auto-generated development logs from Claude Code session
 // ============================================================================
 
 function main() {
-  // Read input from stdin (Claude Code passes conversation data)
-  const input = process.argv[2];
+  // Read input from stdin (Claude Code passes conversation data as JSON)
+  let inputData = '';
 
-  if (!input) {
+  // Check if there's stdin input (synchronous read)
+  try {
+    inputData = fs.readFileSync(0, 'utf-8');
+  } catch (error) {
     console.error('No input provided to hook');
     process.exit(0);
   }
 
+  if (!inputData.trim()) {
+    console.error('Empty input provided to hook');
+    process.exit(0);
+  }
+
   try {
-    // Parse conversation data
-    const data = JSON.parse(input);
-    const { userPrompt, claudeResponse } = data;
+    // Parse hook input JSON
+    const hookData = JSON.parse(inputData);
+
+    // Extract prompt from UserPromptSubmit hook data
+    const userPrompt = hookData.prompt || '';
+
+    // For UserPromptSubmit, we don't have Claude's response yet
+    // So we'll just log the prompt
+    const claudeResponse = '';
+
+    // Log the prompt we received (for debugging)
+    // console.error(`[DEBUG] Received prompt: ${userPrompt.substring(0, 100)}...`);
 
     // Filter: Only log relevant conversations
     if (!isRelevantConversation(userPrompt, claudeResponse)) {
-      console.log('Skipping: Not technically relevant');
+      // Silent skip - don't pollute output
       process.exit(0);
     }
 
@@ -284,11 +324,13 @@ function main() {
     const logFilePath = saveLogEntry(entry, gitContext);
     updateIndex(logFilePath, gitContext);
 
-    console.log(`✅ Logged to: ${path.relative(process.cwd(), logFilePath)}`);
+    // Output success message (will be shown in Claude Code)
+    console.log(`✓ Prompt logged to ${path.basename(logFilePath)}`);
 
   } catch (error) {
-    console.error('Hook error:', error.message);
-    // Don't fail the main Claude Code operation
+    // Log error to stderr (won't block Claude Code)
+    console.error(`[prompt-logger] Error: ${error.message}`);
+    // Always exit 0 to not fail the main Claude Code operation
     process.exit(0);
   }
 }
