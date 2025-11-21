@@ -33,20 +33,11 @@ fi
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$HOOK_DIR/../.." && pwd)"
 
-# Only auto-post if the commit has been pushed to remote
-# This prevents "phantom commit" comments for unpushed local commits
-CURRENT_COMMIT=$(git rev-parse HEAD)
-if git branch -r --contains "$CURRENT_COMMIT" 2>/dev/null | grep -q "origin/"; then
-    # Commit exists on remote, safe to post
-    if [ -f "$PROJECT_ROOT/.claude/scripts/auto-summary.sh" ]; then
-        "$PROJECT_ROOT/.claude/scripts/auto-summary.sh"
-    else
-        echo "⚠️  Auto-summary script not found"
-        echo "   Expected: $PROJECT_ROOT/.claude/scripts/auto-summary.sh"
-        exit 0
-    fi
+# Run the auto-summary script
+if [ -f "$PROJECT_ROOT/.claude/scripts/auto-summary.sh" ]; then
+    "$PROJECT_ROOT/.claude/scripts/auto-summary.sh"
 else
-    echo "ℹ️  Commit not yet pushed to remote, skipping auto-comment"
-    echo "   Run 'git push' then the comment will be posted automatically"
+    echo "⚠️  Auto-summary script not found"
+    echo "   Expected: $PROJECT_ROOT/.claude/scripts/auto-summary.sh"
     exit 0
 fi

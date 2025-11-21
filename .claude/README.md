@@ -44,14 +44,13 @@ Modified files A, B, C to support this change."
 
 ### 3. Automatic GitHub Updates
 
-**The post-commit hook runs automatically after push** and:
-- ✅ Checks if commit exists on remote (only posts for pushed commits)
+**The post-commit hook runs automatically** and:
 - ✅ Extracts context from git (commits, diff, files)
 - ✅ Generates summary from your commit message
 - ✅ Posts to GitHub issue/PR automatically
 - ✅ **Zero manual work required!**
 
-**Note:** Comments are only posted for commits that have been pushed to remote. This prevents "phantom commit" comments for local-only changes.
+**Note:** Comments post immediately after commits (before push). This is intentional - you commit when ready to share, then push shortly after. If you're experimenting with commits you don't intend to push, use `export DISABLE_AUTO_COMMENT=true` to prevent auto-posting.
 
 ### 4. Create PR & Merge
 
