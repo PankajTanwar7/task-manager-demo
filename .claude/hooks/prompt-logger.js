@@ -200,6 +200,50 @@ function extractSummary(response) {
 }
 
 /**
+ * Save prompt to .claude/prompt-history.json for auto-summary integration
+ */
+function savePromptHistory(userPrompt, gitContext, timestamp) {
+  const claudeDir = path.join(process.cwd(), '.claude');
+  const historyFile = path.join(claudeDir, 'prompt-history.json');
+
+  // Ensure .claude directory exists
+  if (!fs.existsSync(claudeDir)) {
+    fs.mkdirSync(claudeDir, { recursive: true });
+  }
+
+  // Read existing history
+  let history = [];
+  if (fs.existsSync(historyFile)) {
+    try {
+      const content = fs.readFileSync(historyFile, 'utf-8');
+      history = JSON.parse(content);
+      if (!Array.isArray(history)) {
+        history = [];
+      }
+    } catch (error) {
+      // Invalid JSON, start fresh
+      history = [];
+    }
+  }
+
+  // Add new prompt entry
+  history.push({
+    prompt: userPrompt,
+    timestamp: timestamp,
+    issueNumber: gitContext.issueNumber || null,
+    branch: gitContext.branch
+  });
+
+  // Keep only last 50 prompts to prevent file bloat
+  if (history.length > 50) {
+    history = history.slice(-50);
+  }
+
+  // Save updated history
+  fs.writeFileSync(historyFile, JSON.stringify(history, null, 2));
+}
+
+/**
  * Save log entry to appropriate file
  */
 function saveLogEntry(entry, gitContext) {
@@ -319,6 +363,9 @@ function main() {
       modifiedFiles,
       timestamp
     });
+
+    // Save to prompt history (for auto-summary integration)
+    savePromptHistory(userPrompt, gitContext, timestamp);
 
     // Save to file
     const logFilePath = saveLogEntry(entry, gitContext);

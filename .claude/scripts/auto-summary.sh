@@ -111,7 +111,7 @@ extract_github_context() {
 }
 
 ###############################################################################
-# Prompt Capture (Autonomous)
+# Prompt Capture (Autonomous with Priority Chain)
 ###############################################################################
 
 extract_trigger_prompt() {
@@ -122,7 +122,23 @@ extract_trigger_prompt() {
 
     TRIGGER_PROMPT=""
 
-    # Method 1: GitHub event data (if in Actions)
+    # Method 1: Claude Code prompt history (highest priority for local development)
+    local prompt_history_file=".claude/prompt-history.json"
+    if [ -f "$prompt_history_file" ]; then
+        # Get the most recent prompt for this branch
+        local recent_prompt
+        recent_prompt=$(jq -r --arg branch "$BRANCH" '
+            .[] | select(.branch == $branch) | .prompt
+        ' "$prompt_history_file" 2>/dev/null | tail -1)
+
+        if [ -n "$recent_prompt" ] && [ "$recent_prompt" != "null" ]; then
+            TRIGGER_PROMPT="$recent_prompt"
+            print_success "Captured prompt from Claude Code history"
+            return 0
+        fi
+    fi
+
+    # Method 2: GitHub event data (if in Actions)
     if [ -n "${GITHUB_EVENT_PATH:-}" ] && [ -f "$GITHUB_EVENT_PATH" ]; then
         local event_body
         event_body=$(jq -r '.comment.body // .issue.body // .pull_request.body // ""' "$GITHUB_EVENT_PATH" 2>/dev/null)
@@ -136,7 +152,7 @@ extract_trigger_prompt() {
         fi
     fi
 
-    # Method 2: GitHub API (fallback)
+    # Method 3: GitHub API (fallback for @claude mentions)
     if [ "$target_type" = "pr" ]; then
         local pr_comments
         pr_comments=$(gh pr view "$target_num" --json comments --jq '.comments | reverse | .[] | select(.body | contains("@claude")) | .body' 2>/dev/null | head -1)

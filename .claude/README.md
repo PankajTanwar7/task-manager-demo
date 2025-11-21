@@ -19,6 +19,41 @@ Automated workflow system for Claude Code development with GitHub integration. T
 
 This installs the post-commit hook that enables automatic GitHub comments.
 
+### 0.1. Enable Claude Code Prompt Capture (Optional but Recommended)
+
+To capture your actual prompts from Claude Code desktop app:
+
+**Step 1:** Add the hook to your Claude Code settings
+
+Open your Claude Code settings (usually `~/.config/claude-code/config.json` or similar) and add:
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": {
+      "command": "/absolute/path/to/your/repo/.claude/hooks/prompt-logger.js"
+    }
+  }
+}
+```
+
+**Step 2:** Make the hook executable
+
+```bash
+chmod +x .claude/hooks/prompt-logger.js
+```
+
+**Step 3:** Test it
+
+Open Claude Code, give it a prompt like "Add a loading spinner", and you should see:
+```
+✓ Prompt logged to issue-23.md
+```
+
+Your prompts will now be saved to `.claude/prompt-history.json` and automatically included in GitHub comments!
+
+**Without this setup:** Comments will still work, but will use commit messages or GitHub @claude mentions as the "prompt".
+
 ### 1. Start Work on an Issue
 
 ```bash
@@ -79,43 +114,74 @@ gh pr merge          # Merges and auto-closes issue
 
 ### Autonomous Context System
 
-The system captures everything automatically from two sources:
+The system captures everything automatically from three sources with a priority chain:
 
-**1. GitHub API (for prompts):**
-- Extracts the @claude mention that triggered the work
-- Uses GitHub event data (in Actions) or API fallback
-- Shows what you originally asked for
+**Priority Chain for Prompt Capture:**
+1. **Claude Code Prompt History** (`.claude/prompt-history.json`) - Highest priority
+   - Captures actual prompts from local Claude Code desktop usage
+   - Requires Claude Code hook setup (see section 0.1 above)
+   - Most accurate for local development
 
-**2. Git History (for implementation):**
+2. **GitHub API** (@claude mentions) - Fallback
+   - Extracts @claude mentions from GitHub comments
+   - Works in GitHub Actions workflows
+   - Good for collaborative development
+
+3. **Commit Messages** - Last resort
+   - Uses commit message as proxy for intent
+   - Always available
+
+**Implementation Data (Git History):**
 - Extracts commits, diffs, and file changes
 - Shows what was actually delivered
 - All data persists across sessions
 
 ```
-User mentions @claude in comment
+LOCAL DEVELOPMENT WORKFLOW:
+User works with Claude Code desktop app
       ↓
-Claude Code does the work and commits
+Gives prompt: "Add a loading spinner"
+      ↓
+Claude Code hook captures prompt → .claude/prompt-history.json
+      ↓
+Claude Code implements changes
+      ↓
+User commits: git commit -m "feat: add loading state"
       ↓
 Post-commit hook triggers (.git/hooks/post-commit)
       ↓
 Auto-summary script runs (.claude/scripts/auto-summary.sh)
-      ├─ Captures: @claude mention (trigger prompt)
-      ├─ Extracts: git log (commits)
-      ├─ Extracts: git diff (changes)
-      ├─ Extracts: gh issue view (requirements)
+      ├─ Reads prompt from: .claude/prompt-history.json
+      ├─ Extracts commits: git log
+      ├─ Extracts changes: git diff
+      ├─ Extracts context: gh issue view
       └─ Generates: formatted summary
       ↓
-Posts to GitHub (issue or PR)
+Posts to GitHub (issue or PR) with:
+      ├─ 💬 Actual Prompt: "Add a loading spinner"
+      └─ ✅ What Was Delivered: [commit details]
       ↓
-Done! No manual input needed
+Done! Perfect traceability
+
+GITHUB ACTIONS WORKFLOW:
+User posts: @claude add loading spinner
+      ↓
+GitHub Actions triggers
+      ↓
+Claude Code Action implements changes and commits
+      ↓
+Post-commit hook extracts @claude mention from GitHub API
+      ↓
+Posts formatted comment with GitHub mention as prompt
 ```
 
 **Why This Works:**
-- ✅ Captures actual prompts autonomously (no manual logging)
+- ✅ Captures actual prompts from Claude Code desktop (with hook)
+- ✅ Fallback to GitHub mentions (without hook)
 - ✅ Git history persists across sessions
-- ✅ No stale data (GitHub API + git are always current)
-- ✅ No fragile JSON files to maintain
+- ✅ No stale data (all sources are current)
 - ✅ Clear "request vs delivery" format
+- ✅ Works for both local and CI/CD workflows
 
 ---
 
@@ -166,10 +232,14 @@ export DEBUG_POST_SUMMARY=true
 ```
 .claude/
   ├─ scripts/
-  │   └─ auto-summary.sh       # Auto-generates comments from git
+  │   ├─ auto-summary.sh       # Auto-generates comments from git + prompts
+  │   └─ install-hooks.sh      # Installs git hooks
   ├─ hooks/
   │   ├─ post-summary.sh       # Manual comment posting (legacy)
-  │   └─ prompt-logger.js      # Captures prompts (informational only)
+  │   ├─ prompt-logger.js      # Captures prompts from Claude Code ⭐
+  │   └─ templates/
+  │       └─ post-commit       # Template for git post-commit hook
+  ├─ prompt-history.json       # Captured prompts (auto-generated) ⭐
   └─ README.md                 # This file
 
 .git/hooks/
@@ -180,8 +250,12 @@ scripts/
   ├─ parse-coverage.sh         # Parse test coverage
   └─ cleanup.sh                # Post-merge cleanup (if exists)
 
-docs/dev-logs/                 # Session logs per issue
+docs/dev-logs/                 # Detailed session logs per issue
 ```
+
+**⭐ Key Files for Prompt Capture:**
+- `.claude/hooks/prompt-logger.js` - Hook that captures your Claude Code prompts
+- `.claude/prompt-history.json` - Where captured prompts are stored (auto-generated)
 
 ---
 
