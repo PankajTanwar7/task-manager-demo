@@ -69,7 +69,8 @@
 #                  Modified parse-coverage.sh:54-61. Tested with npm test."
 ###############################################################################
 
-set -e
+set -euo pipefail  # Fail on errors, undefined vars, pipe failures
+IFS=$'\n\t'        # Prevent word splitting issues
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -80,13 +81,35 @@ source "$PROJECT_ROOT/scripts/parse-coverage.sh"
 # Debug logging (optional, controlled by DEBUG_POST_SUMMARY env var)
 DEBUG_LOG=".claude/post-summary-debug.log"
 log_debug() {
-  if [ "$DEBUG_POST_SUMMARY" = "true" ]; then
+  if [ "${DEBUG_POST_SUMMARY:-false}" = "true" ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$DEBUG_LOG"
   fi
 }
 
+###############################################################################
+# Security Functions
+###############################################################################
+
+# Sanitize input to prevent command injection
+# Usage: SAFE_VAR=$(sanitize_input "$UNSAFE_VAR")
+sanitize_input() {
+  local input="$1"
+  # Escape shell metacharacters: $ ` \ ! ; | & ( ) < >
+  # Using printf instead of echo for safety with special characters
+  printf '%s' "$input" | sed 's/[$`\\!;|&()<>]/\\&/g'
+}
+
+# Sanitize for GitHub to prevent unwanted @mentions and injections
+# Usage: SAFE_COMMENT=$(sanitize_for_github "$COMMENT")
+sanitize_for_github() {
+  local input="$1"
+  # Escape all @mentions (add space after @)
+  # Also escape shell metacharacters
+  echo "$input" | sed 's/@/@ /g; s/[$`]/\\&/g'
+}
+
 # Check if auto-commenting is disabled
-if [ "$DISABLE_AUTO_COMMENT" = "true" ]; then
+if [ "${DISABLE_AUTO_COMMENT:-false}" = "true" ]; then
   echo "ℹ️  Auto-commenting is disabled (DISABLE_AUTO_COMMENT=true)"
   echo "To enable: unset DISABLE_AUTO_COMMENT"
   exit 0
@@ -119,7 +142,7 @@ fi
 if [ -n "$1" ]; then
   if [ -n "$3" ]; then
     # 3 parameters: manual override with explicit actual prompt (PRIORITY 1)
-    ACTUAL_PROMPT="$1"
+    ACTUAL_PROMPT=$(sanitize_input "$1")
     USER_PROMPT="$2"
     ACHIEVEMENT="$3"
     PROMPT_SOURCE="manual-override"
@@ -145,7 +168,7 @@ if [ -n "$1" ]; then
         HISTORY_PROMPT=$(jq -r '.prompts[-1].prompt // ""' "$HISTORY_FILE" 2>/dev/null || echo "")
 
         if [ -n "$HISTORY_PROMPT" ] && [ "$HISTORY_ISSUE" = "$ISSUE_NUM" ]; then
-          ACTUAL_PROMPT="$HISTORY_PROMPT"
+          ACTUAL_PROMPT=$(sanitize_input "$HISTORY_PROMPT")
           PROMPT_SOURCE="prompt-history"
           log_debug "SUCCESS: Loaded from prompt history (${#ACTUAL_PROMPT} chars, issue $HISTORY_ISSUE)"
           echo "✓ Loaded prompt from history (fresh session capture)"
@@ -169,12 +192,13 @@ if [ -n "$1" ]; then
       log_debug "Checking workflow file: $WORKFLOW_PROMPT_FILE"
       if [ -f "$WORKFLOW_PROMPT_FILE" ]; then
         # Security: Validate file size before reading (1MB limit)
-        FILE_SIZE=$(stat -f%z "$WORKFLOW_PROMPT_FILE" 2>/dev/null || stat -c%s "$WORKFLOW_PROMPT_FILE" 2>/dev/null)
+        # Using wc -c for portability across macOS and Linux
+        FILE_SIZE=$(wc -c < "$WORKFLOW_PROMPT_FILE" 2>/dev/null | tr -d ' ' || echo 0)
         if [ "$FILE_SIZE" -gt 1048576 ]; then  # 1MB = 1048576 bytes
           log_debug "Workflow file too large: ${FILE_SIZE} bytes (limit: 1MB)"
           echo "⚠️  Workflow file too large (${FILE_SIZE} bytes), skipping"
         else
-          ACTUAL_PROMPT=$(cat "$WORKFLOW_PROMPT_FILE")
+          ACTUAL_PROMPT=$(sanitize_input "$(cat "$WORKFLOW_PROMPT_FILE")")
           PROMPT_SOURCE="workflow-file"
           log_debug "SUCCESS: Loaded from workflow file (${#ACTUAL_PROMPT} chars)"
           echo "✓ Loaded prompt from workflow file: $WORKFLOW_PROMPT_FILE"
@@ -198,7 +222,8 @@ if [ -n "$1" ]; then
 else
   # Interactive mode
   echo "What was the actual prompt? (press Enter to skip)"
-  read -r ACTUAL_PROMPT
+  read -r ACTUAL_PROMPT_RAW
+  ACTUAL_PROMPT=$(sanitize_input "$ACTUAL_PROMPT_RAW")
   echo "What did you ask Claude to do? (formatted request)"
   read -r USER_PROMPT
   echo "What was achieved?"
@@ -247,8 +272,8 @@ ${actual_prompt}
 # Get commits and files
 BASE_BRANCH="main"
 COMMITS=$(git log --oneline ${BASE_BRANCH}..HEAD 2>/dev/null | head -10)
-# Escape @mentions in commit messages to prevent triggering GitHub notifications
-COMMITS=$(echo "$COMMITS" | sed 's/@claude/@ claude/g')
+# Escape ALL @mentions in commit messages to prevent triggering unwanted GitHub notifications
+COMMITS=$(sanitize_for_github "$COMMITS")
 COMMIT_COUNT=$(echo "$COMMITS" | wc -l)
 
 # Get files changed in latest commit only (incremental)

@@ -1,0 +1,43 @@
+#!/bin/bash
+
+###############################################################################
+# Git Post-Commit Hook - Auto GitHub Comment
+#
+# Automatically posts progress updates to GitHub after each commit using
+# git context (commits, diffs, files) instead of trying to capture prompts.
+#
+# This hook runs after every successful commit and:
+#   1. Extracts context from git history
+#   2. Generates a summary from commit messages + diffs
+#   3. Posts to the appropriate GitHub issue or PR
+#
+# Benefits:
+#   ✅ Zero manual work (fully automatic)
+#   ✅ Works across session resumptions (git persists)
+#   ✅ No stale data bugs (git is source of truth)
+#   ✅ High quality (based on actual changes, not captured prompts)
+#
+# To disable: Set DISABLE_AUTO_COMMENT=true in your environment
+# To enable: unset DISABLE_AUTO_COMMENT (or remove the variable)
+###############################################################################
+
+set -euo pipefail
+
+# Check if auto-commenting is disabled
+if [ "${DISABLE_AUTO_COMMENT:-false}" = "true" ]; then
+    echo "ℹ️  Auto-comment disabled (DISABLE_AUTO_COMMENT=true)"
+    exit 0
+fi
+
+# Get script directory (handle symlinks)
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$HOOK_DIR/../.." && pwd)"
+
+# Run the auto-summary script
+if [ -f "$PROJECT_ROOT/.claude/scripts/auto-summary.sh" ]; then
+    "$PROJECT_ROOT/.claude/scripts/auto-summary.sh"
+else
+    echo "⚠️  Auto-summary script not found"
+    echo "   Expected: $PROJECT_ROOT/.claude/scripts/auto-summary.sh"
+    exit 0
+fi
