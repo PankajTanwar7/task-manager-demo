@@ -176,7 +176,7 @@ $diff_stat"
 #   3. .claude-prompt-issue-{NUM}.md (workflow file, survives resumption)
 #   4. Skip Actual Prompt section (no source found)
 
-if [ "$1" = "interactive" ]; then
+if [ "${1:-}" = "interactive" ]; then
   # Interactive mode - prompt for everything
   echo "What was the actual prompt? (press Enter to skip)"
   read -r ACTUAL_PROMPT_RAW
@@ -187,14 +187,14 @@ if [ "$1" = "interactive" ]; then
   read -r ACHIEVEMENT
   PROMPT_SOURCE="interactive"
 
-elif [ -n "$3" ]; then
+elif [ -n "${3:-}" ]; then
   # 3 parameters: manual override with explicit actual prompt (PRIORITY 1)
   ACTUAL_PROMPT=$(sanitize_input "$1")
   USER_PROMPT="$2"
   ACHIEVEMENT="$3"
   PROMPT_SOURCE="manual-override"
 
-elif [ -n "$1" ]; then
+elif [ -n "${1:-}" ]; then
   # 2 parameters: SEMI-AUTO MODE with priority chain
   USER_PROMPT="$1"
   ACHIEVEMENT="$2"
