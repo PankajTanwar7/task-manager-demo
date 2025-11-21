@@ -1,0 +1,11 @@
+# GitHub Claude Configuration
+# This disables automatic GitHub Claude responses
+
+# Disable auto-responses to @claude mentions
+auto_respond: false
+
+# Only respond when explicitly requested via workflow
+manual_only: true
+
+# Note: We use Claude Code CLI for implementation
+# GitHub @claude integration is disabled to prevent conflicts
