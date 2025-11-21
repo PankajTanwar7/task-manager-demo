@@ -11,6 +11,14 @@ Automated workflow system for Claude Code development with GitHub integration. T
 
 ## Quick Start
 
+### 0. Install Git Hooks (One-Time Setup)
+
+```bash
+./.claude/scripts/install-hooks.sh
+```
+
+This installs the post-commit hook that enables automatic GitHub comments.
+
 ### 1. Start Work on an Issue
 
 ```bash
@@ -199,6 +207,19 @@ Tests: Added test case for null completedAt"
 
 ## Troubleshooting
 
+### Hook Not Installed
+
+If automatic comments aren't working:
+
+```bash
+# Re-run the installation script:
+./.claude/scripts/install-hooks.sh
+
+# Verify installation:
+ls -la .git/hooks/post-commit
+# Should show: -rwxr-xr-x (executable)
+```
+
 ### Hook Not Running
 
 ```bash
@@ -284,6 +305,6 @@ This is useful for:
 
 ---
 
-**Last Updated:** 2025-11-22 (Phase 2 Complete)
+**Last Updated:** 2025-11-21 (Phase 2 Complete + Review Fixes)
 **Audit Status:** ✅ Security Hardened
 **Automation Status:** ✅ Fully Automatic

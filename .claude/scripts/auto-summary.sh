@@ -57,6 +57,13 @@ extract_git_context() {
 
     # Extract issue/PR number from branch name
     ISSUE_NUM=$(echo "$BRANCH" | grep -oP '\d+' | head -1 || echo "")
+
+    # Security: Validate extracted issue number
+    if [ -n "$ISSUE_NUM" ] && ! [[ "$ISSUE_NUM" =~ ^[0-9]+$ ]]; then
+        print_warning "Invalid issue number extracted: $ISSUE_NUM"
+        ISSUE_NUM=""
+    fi
+
     PR_NUM=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
 
     if [ -z "$ISSUE_NUM" ] && [ -z "$PR_NUM" ]; then
@@ -67,12 +74,12 @@ extract_git_context() {
     # Get commit info
     LAST_COMMIT_MSG=$(git log -1 --format=%s)
     LAST_COMMIT_BODY=$(git log -1 --format=%b)
-    ALL_COMMITS=$(git log ${base_branch}..HEAD --format="%h %s" 2>/dev/null | head -10)
+    ALL_COMMITS=$(git log "${base_branch}..HEAD" --format="%h %s" 2>/dev/null | head -10)
     COMMIT_COUNT=$(echo "$ALL_COMMITS" | wc -l)
 
     # Get diff stats
-    DIFF_STAT=$(git diff ${base_branch}..HEAD --stat 2>/dev/null | tail -1)
-    FILES_CHANGED=$(git diff ${base_branch}..HEAD --name-only 2>/dev/null | wc -l)
+    DIFF_STAT=$(git diff "${base_branch}..HEAD" --stat 2>/dev/null | tail -1)
+    FILES_CHANGED=$(git diff "${base_branch}..HEAD" --name-only 2>/dev/null | wc -l)
     LATEST_FILES=$(git diff HEAD~1..HEAD --name-only 2>/dev/null || git diff --cached --name-only 2>/dev/null)
     LATEST_FILE_COUNT=$(echo "$LATEST_FILES" | grep -v '^$' | wc -l)
 
@@ -245,24 +252,51 @@ post_to_github() {
     local target_type="${2}"
     local comment="${3}"
 
-    # Get/update counter
+    # Get/update counter with file locking to prevent race conditions
     SESSION_FILE=".claude/session-counter.json"
+    LOCK_FILE=".claude/session-counter.lock"
+
     [ ! -f "$SESSION_FILE" ] && echo '{}' > "$SESSION_FILE"
 
-    if [ "$target_type" = "pr" ]; then
-        KEY="pr-${target_num}"
-        COUNT=$(jq -r ".[\"$KEY\"] // 0" "$SESSION_FILE")
-        COUNT=$((COUNT + 1))
-        jq ".[\"$KEY\"] = $COUNT" "$SESSION_FILE" > "$SESSION_FILE.tmp" && mv "$SESSION_FILE.tmp" "$SESSION_FILE"
+    # Acquire lock (with flock if available, fallback to simple approach)
+    if command -v flock &> /dev/null; then
+        # Use flock for proper locking
+        (
+            flock -x 200  # Exclusive lock on fd 200
 
+            if [ "$target_type" = "pr" ]; then
+                KEY="pr-${target_num}"
+                COUNT=$(jq -r ".[\"$KEY\"] // 0" "$SESSION_FILE")
+                COUNT=$((COUNT + 1))
+                jq ".[\"$KEY\"] = $COUNT" "$SESSION_FILE" > "$SESSION_FILE.tmp" && mv "$SESSION_FILE.tmp" "$SESSION_FILE"
+            else
+                KEY="issue-${target_num}"
+                COUNT=$(jq -r ".[\"$KEY\"] // 0" "$SESSION_FILE")
+                COUNT=$((COUNT + 1))
+                jq ".[\"$KEY\"] = $COUNT" "$SESSION_FILE" > "$SESSION_FILE.tmp" && mv "$SESSION_FILE.tmp" "$SESSION_FILE"
+            fi
+
+        ) 200>"$LOCK_FILE"
+    else
+        # Fallback without flock (less safe but works)
+        if [ "$target_type" = "pr" ]; then
+            KEY="pr-${target_num}"
+            COUNT=$(jq -r ".[\"$KEY\"] // 0" "$SESSION_FILE")
+            COUNT=$((COUNT + 1))
+            jq ".[\"$KEY\"] = $COUNT" "$SESSION_FILE" > "$SESSION_FILE.tmp" && mv "$SESSION_FILE.tmp" "$SESSION_FILE"
+        else
+            KEY="issue-${target_num}"
+            COUNT=$(jq -r ".[\"$KEY\"] // 0" "$SESSION_FILE")
+            COUNT=$((COUNT + 1))
+            jq ".[\"$KEY\"] = $COUNT" "$SESSION_FILE" > "$SESSION_FILE.tmp" && mv "$SESSION_FILE.tmp" "$SESSION_FILE"
+        fi
+    fi
+
+    # Post to GitHub
+    if [ "$target_type" = "pr" ]; then
         echo "$comment" | gh pr comment "$target_num" --body-file -
         print_success "Posted to PR #${target_num} (Update #${COUNT})"
     else
-        KEY="issue-${target_num}"
-        COUNT=$(jq -r ".[\"$KEY\"] // 0" "$SESSION_FILE")
-        COUNT=$((COUNT + 1))
-        jq ".[\"$KEY\"] = $COUNT" "$SESSION_FILE" > "$SESSION_FILE.tmp" && mv "$SESSION_FILE.tmp" "$SESSION_FILE"
-
         echo "$comment" | gh issue comment "$target_num" --body-file -
         print_success "Posted to Issue #${target_num} (Response #${COUNT})"
     fi

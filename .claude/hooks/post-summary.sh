@@ -94,8 +94,9 @@ log_debug() {
 # Usage: SAFE_VAR=$(sanitize_input "$UNSAFE_VAR")
 sanitize_input() {
   local input="$1"
-  # Escape shell metacharacters: $ ` \
-  echo "$input" | sed 's/[$`\\]/\\&/g'
+  # Escape shell metacharacters: $ ` \ ! ; | & ( ) < >
+  # Using printf instead of echo for safety with special characters
+  printf '%s' "$input" | sed 's/[$`\\!;|&()<>]/\\&/g'
 }
 
 # Sanitize for GitHub to prevent unwanted @mentions and injections
@@ -191,7 +192,8 @@ if [ -n "$1" ]; then
       log_debug "Checking workflow file: $WORKFLOW_PROMPT_FILE"
       if [ -f "$WORKFLOW_PROMPT_FILE" ]; then
         # Security: Validate file size before reading (1MB limit)
-        FILE_SIZE=$(stat -f%z "$WORKFLOW_PROMPT_FILE" 2>/dev/null || stat -c%s "$WORKFLOW_PROMPT_FILE" 2>/dev/null)
+        # Using wc -c for portability across macOS and Linux
+        FILE_SIZE=$(wc -c < "$WORKFLOW_PROMPT_FILE" 2>/dev/null | tr -d ' ' || echo 0)
         if [ "$FILE_SIZE" -gt 1048576 ]; then  # 1MB = 1048576 bytes
           log_debug "Workflow file too large: ${FILE_SIZE} bytes (limit: 1MB)"
           echo "⚠️  Workflow file too large (${FILE_SIZE} bytes), skipping"
