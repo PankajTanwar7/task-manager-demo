@@ -25,6 +25,10 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Source coverage parsing helper
+source "$PROJECT_ROOT/scripts/parse-coverage.sh"
 
 # Check if auto-commenting is disabled
 if [ "$DISABLE_AUTO_COMMENT" = "true" ]; then
@@ -109,7 +113,14 @@ ${ACHIEVEMENT}
 
 ---
 
-### Files Changed
+"
+
+  # Add coverage section if available
+  COVERAGE_KEY="coverage-issue-${ISSUE_NUM}"
+  COVERAGE_SECTION=$(parse_coverage_section "$SESSION_FILE" "$COVERAGE_KEY" "$ISSUE_RESPONSE_NUM")
+  [ -n "$COVERAGE_SECTION" ] && ISSUE_COMMENT="${ISSUE_COMMENT}${COVERAGE_SECTION}"
+
+  ISSUE_COMMENT="${ISSUE_COMMENT}### Files Changed
 
 <details>
 <summary>${FILE_COUNT} files modified</summary>
@@ -175,7 +186,14 @@ ${ACHIEVEMENT}
 
 ---
 
-### Files Modified
+"
+
+  # Add coverage section if available
+  COVERAGE_KEY="coverage-pr-${PR_NUM}"
+  COVERAGE_SECTION=$(parse_coverage_section "$SESSION_FILE" "$COVERAGE_KEY" "$PR_UPDATE_NUM")
+  [ -n "$COVERAGE_SECTION" ] && PR_COMMENT="${PR_COMMENT}${COVERAGE_SECTION}"
+
+  PR_COMMENT="${PR_COMMENT}### Files Modified
 
 <details>
 <summary>${FILE_COUNT} files changed</summary>

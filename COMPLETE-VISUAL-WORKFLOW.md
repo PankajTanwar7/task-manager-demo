@@ -129,6 +129,29 @@
 │ ┃                                                                ┃  │
 │ ┃ ---                                                            ┃  │
 │ ┃                                                                ┃  │
+│ ┃ ### Test Coverage                                              ┃  │
+│ ┃                                                                ┃  │
+│ ┃ <details>                                                      ┃  │
+│ ┃ <summary>87.5% overall coverage (+2.3% from previous)</summary>┃  │
+│ ┃                                                                ┃  │
+│ ┃ **Files needing attention (<80%):**                           ┃  │
+│ ┃ - `src/middleware/errorHandler.js` - 72.5%                    ┃  │
+│ ┃ - `src/utils/validation.js` - 65.3%                           ┃  │
+│ ┃                                                                ┃  │
+│ ┃ **Well covered (≥80%):**                                      ┃  │
+│ ┃ - `src/auth/jwt.js` - 95.0%                                   ┃  │
+│ ┃ - `src/routes/auth.js` - 88.7%                                ┃  │
+│ ┃ - `tests/auth.test.js` - 100%                                 ┃  │
+│ ┃                                                                ┃  │
+│ ┃ **Overall Statistics:**                                        ┃  │
+│ ┃ - Lines: 87.5% (210/240)                                      ┃  │
+│ ┃ - Statements: 86.8% (220/253)                                 ┃  │
+│ ┃ - Functions: 90.0% (18/20)                                    ┃  │
+│ ┃ - Branches: 82.5% (33/40)                                     ┃  │
+│ ┃ </details>                                                     ┃  │
+│ ┃                                                                ┃  │
+│ ┃ ---                                                            ┃  │
+│ ┃                                                                ┃  │
 │ ┃ ### Files Changed                                              ┃  │
 │ ┃                                                                ┃  │
 │ ┃ <details>                                                      ┃  │
