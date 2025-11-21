@@ -200,7 +200,10 @@ Time: ${TIMESTAMP}
 
   # Add Actual Prompt section if provided
   ACTUAL_PROMPT_SECTION=$(format_actual_prompt "$ACTUAL_PROMPT")
-  [ -n "$ACTUAL_PROMPT_SECTION" ] && ISSUE_COMMENT="${ISSUE_COMMENT}${ACTUAL_PROMPT_SECTION}"
+  if [ -n "$ACTUAL_PROMPT_SECTION" ]; then
+    ISSUE_COMMENT="${ISSUE_COMMENT}${ACTUAL_PROMPT_SECTION}
+"
+  fi
 
   ISSUE_COMMENT="${ISSUE_COMMENT}### Request
 
@@ -306,7 +309,10 @@ Time: ${TIMESTAMP}
 
   # Add Actual Prompt section if provided
   ACTUAL_PROMPT_SECTION=$(format_actual_prompt "$ACTUAL_PROMPT")
-  [ -n "$ACTUAL_PROMPT_SECTION" ] && PR_COMMENT="${PR_COMMENT}${ACTUAL_PROMPT_SECTION}"
+  if [ -n "$ACTUAL_PROMPT_SECTION" ]; then
+    PR_COMMENT="${PR_COMMENT}${ACTUAL_PROMPT_SECTION}
+"
+  fi
 
   PR_COMMENT="${PR_COMMENT}### Request
 
