@@ -292,7 +292,14 @@ Total: 8 files
 - All tests passing
 - Comments documenting progress posted
 
-**Command:**
+**IMPORTANT: Push branch first!**
+
+```bash
+# Push branch to remote
+git push -u origin feature/{issue-number}--{description}
+```
+
+**Create PR with @claude review request:**
 
 ```bash
 # Create PR with comprehensive description
@@ -316,14 +323,59 @@ gh pr create --title "feat: add pagination to task list API (Issue #16)" --body 
 ## Design Decisions
 [Key architectural choices]
 
+## API Examples
+[Request/response examples]
+
+---
+
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+**Closes #16**
+
+---
+
+@claude review it
 EOF
 )"
 ```
 
+**CRITICAL: After PR created, do NOT post a ClaudeCode Update comment immediately!**
+
+The PR description IS the summary. Update comments are ONLY for changes made AFTER code review.
+
+**Correct Workflow After PR Creation:**
+
+1. ✅ PR created with comprehensive description
+2. ✅ `@claude review it` triggers automatic review
+3. ⏳ Wait for @claude to post review comments
+4. 🔧 Make changes based on review feedback
+5. ✅ Commit changes
+6. ✅ Push changes
+7. ✅ **THEN** post ClaudeCode Update comment documenting what was fixed
+
+**Wrong Workflow:**
+1. ❌ Create PR
+2. ❌ Immediately post ClaudeCode Update #1 (duplicate/unnecessary!)
+3. ❌ Creates confusion
+
+**When to Use post-summary.sh for PRs:**
+
+```bash
+# ONLY use after making changes from review feedback
+git add .
+git commit -m "fix: address review feedback..."
+git push
+
+# NOW post update comment
+./.claude/hooks/post-summary.sh \
+  "Address code review feedback from @claude" \
+  "Fixed issues identified in review..."
+```
+
 **After PR created:**
-- Future comments go to **PR only** (not Issue)
-- Continue iterating based on review feedback
+- Future change comments go to **PR only** (not Issue)
+- Use post-summary.sh only when pushing changes after review
+- Don't post immediately after PR creation
 
 ---
 
