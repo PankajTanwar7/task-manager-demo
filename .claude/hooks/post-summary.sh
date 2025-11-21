@@ -81,7 +81,7 @@ source "$PROJECT_ROOT/scripts/parse-coverage.sh"
 # Debug logging (optional, controlled by DEBUG_POST_SUMMARY env var)
 DEBUG_LOG=".claude/post-summary-debug.log"
 log_debug() {
-  if [ "$DEBUG_POST_SUMMARY" = "true" ]; then
+  if [ "${DEBUG_POST_SUMMARY:-false}" = "true" ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$DEBUG_LOG"
   fi
 }
@@ -108,7 +108,7 @@ sanitize_for_github() {
 }
 
 # Check if auto-commenting is disabled
-if [ "$DISABLE_AUTO_COMMENT" = "true" ]; then
+if [ "${DISABLE_AUTO_COMMENT:-false}" = "true" ]; then
   echo "ℹ️  Auto-commenting is disabled (DISABLE_AUTO_COMMENT=true)"
   echo "To enable: unset DISABLE_AUTO_COMMENT"
   exit 0
