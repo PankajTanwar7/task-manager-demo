@@ -44,11 +44,14 @@ exports.createTask = (req, res, next) => {
 };
 
 /**
- * Get all tasks with optional pagination
+ * Get all tasks with optional pagination, filtering, and sorting
  *
  * Supports query parameters:
  * - page: Page number (positive integer, default: return all)
  * - limit: Items per page (1-100, default: return all)
+ * - status: Filter by status (all|completed|incomplete, default: all)
+ * - sortBy: Sort field (createdAt|updatedAt|title|completed, default: createdAt)
+ * - sortOrder: Sort direction (asc|desc, default: desc)
  *
  * Response format with pagination:
  * {
@@ -75,6 +78,9 @@ exports.createTask = (req, res, next) => {
  * @param {Object} req.query - Query parameters
  * @param {number} [req.query.page] - Page number (validated by middleware)
  * @param {number} [req.query.limit] - Items per page (validated by middleware)
+ * @param {string} [req.query.status] - Filter by status (validated by middleware)
+ * @param {string} [req.query.sortBy] - Sort field (validated by middleware)
+ * @param {string} [req.query.sortOrder] - Sort direction (validated by middleware)
  * @param {Object} res - Express response object
  * @param {Function} next - Express next middleware function
  * @returns {void} Sends 200 JSON response with tasks and pagination metadata
@@ -85,14 +91,16 @@ exports.getAllTasks = (req, res, next) => {
     // matchedData() returns only the fields that passed validation with sanitization applied
     const validated = matchedData(req);
 
-    // Extract pagination and filter parameters with defaults
+    // Extract pagination, filter, and sort parameters with defaults
     const page = validated.page; // Already converted to int by validator
     const limit = validated.limit; // Already converted to int by validator
     const status = validated.status || 'all'; // Already sanitized to lowercase by validator
+    const sortBy = validated.sortBy || 'createdat'; // Already sanitized to lowercase by validator
+    const sortOrder = validated.sortOrder || 'desc'; // Already sanitized to lowercase by validator
 
-    // If no pagination params, return all filtered tasks (backward compatibility)
+    // If no pagination params, return all filtered and sorted tasks (backward compatibility)
     if (!page && !limit) {
-      const tasks = Task.findAll({ status });
+      const tasks = Task.findAll({ status, sortBy, sortOrder });
       return res.status(200).json({
         success: true,
         count: tasks.length,
@@ -104,11 +112,13 @@ exports.getAllTasks = (req, res, next) => {
     const actualPage = page || 1;
     const actualLimit = limit || 10;
 
-    // Get paginated and filtered tasks
+    // Get paginated, filtered, and sorted tasks
     const tasks = Task.findAll({
       page: actualPage,
       limit: actualLimit,
-      status
+      status,
+      sortBy,
+      sortOrder
     });
     const total = Task.count({ status });
 
