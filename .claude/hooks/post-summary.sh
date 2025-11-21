@@ -8,9 +8,15 @@
 # Usage (option 1 - Interactive):
 #   ./.claude/hooks/post-summary.sh
 #
-# Usage (option 2 - With arguments):
+# Usage (option 2 - With arguments, 2 params - backward compatible):
 #   ./.claude/hooks/post-summary.sh \
-#     "Your prompt: Add JSDoc comments" \
+#     "Your formatted request: Add JSDoc comments" \
+#     "Achievement: Added docs to 9 files, 460+ lines, all tests passing"
+#
+# Usage (option 3 - With actual prompt, 3 params - NEW):
+#   ./.claude/hooks/post-summary.sh \
+#     "add comments to codebase" \
+#     "Add comprehensive JSDoc comments throughout the codebase" \
 #     "Achievement: Added docs to 9 files, 460+ lines, all tests passing"
 #
 # Format:
@@ -21,6 +27,7 @@
 #   - If PR exists: Posts to PR ONLY (PR takes precedence)
 #   - If no PR: Posts to Issue
 #   - Never posts to both Issue and PR simultaneously
+#   - PR comments automatically include "@claude review it" to trigger automatic code review
 #
 # Enable/Disable:
 #   - To disable: export DISABLE_AUTO_COMMENT=true
@@ -29,7 +36,15 @@
 # Writing Good Summaries:
 #   See COMMENT-WRITING-GUIDE.md for detailed guidelines and examples
 #
+#   Comment Structure:
+#   - ACTUAL_PROMPT (optional): Raw user input, verbatim
+#     * Shows <= 3 lines: Displayed directly
+#     * Shows > 3 lines: Collapsed with "View full prompt" button
+#   - REQUEST: Formatted/contextualized description of task
+#   - RESPONSE/CHANGES MADE: What was achieved
+#
 #   Quick Tips:
+#   - ACTUAL_PROMPT: Verbatim user input (e.g., "add comments to codebase")
 #   - USER_PROMPT: Be specific, include context
 #   - ACHIEVEMENT: Use structured format with multiple paragraphs
 #     * Explain WHAT was done (specific changes)
@@ -71,20 +86,81 @@ if [ -z "$ISSUE_NUM" ] && [ -z "$PR_NUM" ]; then
 fi
 
 # Get user input
+# Supports 2 formats:
+#   2 params (backward compatible): post-summary.sh "request" "achievement"
+#   3 params (new format): post-summary.sh "actual_prompt" "request" "achievement"
 if [ -n "$1" ]; then
-  USER_PROMPT="$1"
-  ACHIEVEMENT="$2"
+  if [ -n "$3" ]; then
+    # 3 parameters: new format with actual prompt
+    ACTUAL_PROMPT="$1"
+    USER_PROMPT="$2"
+    ACHIEVEMENT="$3"
+  else
+    # 2 parameters: backward compatible (no actual prompt)
+    ACTUAL_PROMPT=""
+    USER_PROMPT="$1"
+    ACHIEVEMENT="$2"
+  fi
 else
-  echo "What did you ask Claude to do?"
+  # Interactive mode
+  echo "What was the actual prompt? (press Enter to skip)"
+  read -r ACTUAL_PROMPT
+  echo "What did you ask Claude to do? (formatted request)"
   read -r USER_PROMPT
   echo "What was achieved?"
   read -r ACHIEVEMENT
 fi
 
+# Function to format Actual Prompt section
+# Returns formatted section or empty string if no actual prompt
+format_actual_prompt() {
+  local actual_prompt="$1"
+
+  # If no actual prompt provided, return empty
+  [ -z "$actual_prompt" ] && return
+
+  # Count lines (newlines + 1)
+  local line_count=$(echo "$actual_prompt" | grep -c $'\n')
+  line_count=$((line_count + 1))
+
+  # If 3 or fewer lines, show directly
+  if [ $line_count -le 3 ]; then
+    echo "### Actual Prompt
+
+${actual_prompt}
+
+---
+
+"
+  else
+    # More than 3 lines, use collapsible details
+    echo "### Actual Prompt
+
+<details>
+<summary>View full prompt (${line_count} lines)</summary>
+
+${actual_prompt}
+
+</details>
+
+---
+
+"
+  fi
+}
+
 # Get commits and files
 BASE_BRANCH="main"
 COMMITS=$(git log --oneline ${BASE_BRANCH}..HEAD 2>/dev/null | head -10)
+# Escape @mentions in commit messages to prevent triggering GitHub notifications
+COMMITS=$(echo "$COMMITS" | sed 's/@claude/@ claude/g')
 COMMIT_COUNT=$(echo "$COMMITS" | wc -l)
+
+# Get files changed in latest commit only (incremental)
+LATEST_COMMIT_FILES=$(git diff --name-only HEAD~1..HEAD 2>/dev/null || git diff --name-only --cached 2>/dev/null)
+LATEST_FILE_COUNT=$(echo "$LATEST_COMMIT_FILES" | grep -v '^$' | wc -l)
+
+# Get all files changed in branch (cumulative)
 CHANGED_FILES=$(git diff --name-only ${BASE_BRANCH}...HEAD 2>/dev/null)
 FILE_COUNT=$(echo "$CHANGED_FILES" | grep -v '^$' | wc -l)
 
@@ -122,11 +198,18 @@ Time: ${TIMESTAMP}
 
 ---
 
-### Request
+"
 
-\`\`\`
+  # Add Actual Prompt section if provided
+  ACTUAL_PROMPT_SECTION=$(format_actual_prompt "$ACTUAL_PROMPT")
+  if [ -n "$ACTUAL_PROMPT_SECTION" ]; then
+    ISSUE_COMMENT="${ISSUE_COMMENT}${ACTUAL_PROMPT_SECTION}
+"
+  fi
+
+  ISSUE_COMMENT="${ISSUE_COMMENT}### Request
+
 ${USER_PROMPT}
-\`\`\`
 
 ---
 
@@ -143,22 +226,49 @@ ${ACHIEVEMENT}
   COVERAGE_SECTION=$(parse_coverage_section "$SESSION_FILE" "$COVERAGE_KEY" "$ISSUE_RESPONSE_NUM")
   [ -n "$COVERAGE_SECTION" ] && ISSUE_COMMENT="${ISSUE_COMMENT}${COVERAGE_SECTION}"
 
-  ISSUE_COMMENT="${ISSUE_COMMENT}### Files Changed
+  ISSUE_COMMENT="${ISSUE_COMMENT}
+### Files Changed in this Response
 
 <details>
-<summary>${FILE_COUNT} files modified</summary>
+<summary>${LATEST_FILE_COUNT} files</summary>
 
 "
 
-  # Add files to issue comment
+  # Add latest commit files to issue comment
+  if [ $LATEST_FILE_COUNT -gt 0 ]; then
+    while IFS= read -r file; do
+      if [ -n "$file" ]; then
+        ISSUE_COMMENT="${ISSUE_COMMENT}- \`${file}\`
+"
+      fi
+    done < <(echo "$LATEST_COMMIT_FILES")
+  fi
+
+  ISSUE_COMMENT="${ISSUE_COMMENT}
+</details>
+
+---
+
+### All Files Changed in this Branch
+
+<details>
+<summary>Total: ${FILE_COUNT} files</summary>
+
+"
+
+  # Add all branch files to issue comment
   if [ $FILE_COUNT -gt 0 ]; then
-    echo "$CHANGED_FILES" | head -15 | while read -r file; do
-      [ -n "$file" ] && ISSUE_COMMENT="${ISSUE_COMMENT}- \`${file}\`
+    while IFS= read -r file; do
+      if [ -n "$file" ]; then
+        ISSUE_COMMENT="${ISSUE_COMMENT}- \`${file}\`
 "
-    done
+      fi
+    done < <(echo "$CHANGED_FILES" | head -15)
 
-    [ $FILE_COUNT -gt 15 ] && ISSUE_COMMENT="${ISSUE_COMMENT}
+    if [ $FILE_COUNT -gt 15 ]; then
+      ISSUE_COMMENT="${ISSUE_COMMENT}
 ... and $((FILE_COUNT - 15)) more files"
+    fi
   fi
 
   ISSUE_COMMENT="${ISSUE_COMMENT}
@@ -167,7 +277,7 @@ ${ACHIEVEMENT}
 
 ---
 
-### Commits
+### Commits in this Branch
 
 \`\`\`
 ${COMMITS}
@@ -195,11 +305,18 @@ Time: ${TIMESTAMP}
 
 ---
 
-### Request
+"
 
-\`\`\`
+  # Add Actual Prompt section if provided
+  ACTUAL_PROMPT_SECTION=$(format_actual_prompt "$ACTUAL_PROMPT")
+  if [ -n "$ACTUAL_PROMPT_SECTION" ]; then
+    PR_COMMENT="${PR_COMMENT}${ACTUAL_PROMPT_SECTION}
+"
+  fi
+
+  PR_COMMENT="${PR_COMMENT}### Request
+
 ${USER_PROMPT}
-\`\`\`
 
 ---
 
@@ -216,22 +333,49 @@ ${ACHIEVEMENT}
   COVERAGE_SECTION=$(parse_coverage_section "$SESSION_FILE" "$COVERAGE_KEY" "$PR_UPDATE_NUM")
   [ -n "$COVERAGE_SECTION" ] && PR_COMMENT="${PR_COMMENT}${COVERAGE_SECTION}"
 
-  PR_COMMENT="${PR_COMMENT}### Files Modified
+  PR_COMMENT="${PR_COMMENT}
+### Files Changed in this Update
 
 <details>
-<summary>${FILE_COUNT} files changed</summary>
+<summary>${LATEST_FILE_COUNT} files</summary>
 
 "
 
-  # Add files to PR comment
+  # Add latest commit files to PR comment
+  if [ $LATEST_FILE_COUNT -gt 0 ]; then
+    while IFS= read -r file; do
+      if [ -n "$file" ]; then
+        PR_COMMENT="${PR_COMMENT}- \`${file}\`
+"
+      fi
+    done < <(echo "$LATEST_COMMIT_FILES")
+  fi
+
+  PR_COMMENT="${PR_COMMENT}
+</details>
+
+---
+
+### All Files Changed in this Branch
+
+<details>
+<summary>Total: ${FILE_COUNT} files</summary>
+
+"
+
+  # Add all branch files to PR comment
   if [ $FILE_COUNT -gt 0 ]; then
-    echo "$CHANGED_FILES" | head -15 | while read -r file; do
-      [ -n "$file" ] && PR_COMMENT="${PR_COMMENT}- \`${file}\`
+    while IFS= read -r file; do
+      if [ -n "$file" ]; then
+        PR_COMMENT="${PR_COMMENT}- \`${file}\`
 "
-    done
+      fi
+    done < <(echo "$CHANGED_FILES" | head -15)
 
-    [ $FILE_COUNT -gt 15 ] && PR_COMMENT="${PR_COMMENT}
+    if [ $FILE_COUNT -gt 15 ]; then
+      PR_COMMENT="${PR_COMMENT}
 ... and $((FILE_COUNT - 15)) more files"
+    fi
   fi
 
   PR_COMMENT="${PR_COMMENT}
@@ -240,7 +384,7 @@ ${ACHIEVEMENT}
 
 ---
 
-### New Commits
+### All Commits in this Branch
 
 \`\`\`
 ${COMMITS}
@@ -251,6 +395,10 @@ ${COMMITS}
 **Status:** Changes pushed to PR and ready for review
 
 <sub>Update #${PR_UPDATE_NUM} - Auto-generated by ClaudeCode</sub>
+
+---
+
+@claude review it
 "
 fi
 

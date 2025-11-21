@@ -22,7 +22,7 @@
 const express = require('express');
 const router = express.Router();
 const taskController = require('../controllers/taskController');
-const { validateCreateTask, validateUpdateTask, validateTaskId } = require('../middleware/validation');
+const { validateCreateTask, validateUpdateTask, validateTaskId, validatePagination } = require('../middleware/validation');
 
 /**
  * POST /api/tasks - Create a new task
@@ -31,10 +31,13 @@ const { validateCreateTask, validateUpdateTask, validateTaskId } = require('../m
 router.post('/', validateCreateTask, taskController.createTask);
 
 /**
- * GET /api/tasks - Get all tasks
- * Returns array of all tasks with count
+ * GET /api/tasks - Get all tasks with optional pagination
+ * Query parameters:
+ * - page: Page number (positive integer, optional)
+ * - limit: Items per page (1-100, optional)
+ * Returns array of all tasks with count or paginated results with metadata
  */
-router.get('/', taskController.getAllTasks);
+router.get('/', validatePagination, taskController.getAllTasks);
 
 /**
  * GET /api/tasks/:id - Get a single task
