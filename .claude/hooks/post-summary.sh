@@ -150,15 +150,19 @@ ${ACHIEVEMENT}
 
 "
 
-  # Add files to issue comment
+  # Add files to issue comment (avoid subshell by not using pipe)
   if [ $FILE_COUNT -gt 0 ]; then
-    echo "$CHANGED_FILES" | head -15 | while read -r file; do
-      [ -n "$file" ] && ISSUE_COMMENT="${ISSUE_COMMENT}- \`${file}\`
+    while IFS= read -r file; do
+      if [ -n "$file" ]; then
+        ISSUE_COMMENT="${ISSUE_COMMENT}- \`${file}\`
 "
-    done
+      fi
+    done < <(echo "$CHANGED_FILES" | head -15)
 
-    [ $FILE_COUNT -gt 15 ] && ISSUE_COMMENT="${ISSUE_COMMENT}
+    if [ $FILE_COUNT -gt 15 ]; then
+      ISSUE_COMMENT="${ISSUE_COMMENT}
 ... and $((FILE_COUNT - 15)) more files"
+    fi
   fi
 
   ISSUE_COMMENT="${ISSUE_COMMENT}
@@ -223,15 +227,19 @@ ${ACHIEVEMENT}
 
 "
 
-  # Add files to PR comment
+  # Add files to PR comment (avoid subshell by not using pipe)
   if [ $FILE_COUNT -gt 0 ]; then
-    echo "$CHANGED_FILES" | head -15 | while read -r file; do
-      [ -n "$file" ] && PR_COMMENT="${PR_COMMENT}- \`${file}\`
+    while IFS= read -r file; do
+      if [ -n "$file" ]; then
+        PR_COMMENT="${PR_COMMENT}- \`${file}\`
 "
-    done
+      fi
+    done < <(echo "$CHANGED_FILES" | head -15)
 
-    [ $FILE_COUNT -gt 15 ] && PR_COMMENT="${PR_COMMENT}
+    if [ $FILE_COUNT -gt 15 ]; then
+      PR_COMMENT="${PR_COMMENT}
 ... and $((FILE_COUNT - 15)) more files"
+    fi
   fi
 
   PR_COMMENT="${PR_COMMENT}
