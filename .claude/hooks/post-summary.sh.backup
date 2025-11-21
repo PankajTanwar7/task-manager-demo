@@ -8,20 +8,16 @@
 # Usage (option 1 - Interactive):
 #   ./.claude/hooks/post-summary.sh
 #
-# Usage (option 2 - AUTO with priority chain, 2 params):
+# Usage (option 2 - With arguments, 2 params - backward compatible):
 #   ./.claude/hooks/post-summary.sh \
 #     "Your formatted request: Add JSDoc comments" \
 #     "Achievement: Added docs to 9 files, 460+ lines, all tests passing"
-#   → Automatically detects prompt from:
-#     1. .claude/prompt-history.json (fresh session, hook captured)
-#     2. .claude-prompt-issue-{NUM}.md (workflow file, survives resumption)
 #
-# Usage (option 3 - MANUAL override, 3 params):
+# Usage (option 3 - With actual prompt, 3 params - NEW):
 #   ./.claude/hooks/post-summary.sh \
 #     "add comments to codebase" \
 #     "Add comprehensive JSDoc comments throughout the codebase" \
 #     "Achievement: Added docs to 9 files, 460+ lines, all tests passing"
-#   → Uses provided actual prompt (highest priority, overrides auto-detection)
 #
 # Format:
 #   - Issue comments: "Response #N" (work-in-progress updates)
@@ -36,11 +32,6 @@
 # Enable/Disable:
 #   - To disable: export DISABLE_AUTO_COMMENT=true
 #   - To enable: unset DISABLE_AUTO_COMMENT (or export DISABLE_AUTO_COMMENT=false)
-#
-# Debug Logging:
-#   - To enable: export DEBUG_POST_SUMMARY=true
-#   - Logs to: .claude/post-summary-debug.log
-#   - Shows: prompt detection flow, sources checked, results
 #
 # Writing Good Summaries:
 #   See COMMENT-WRITING-GUIDE.md for detailed guidelines and examples
@@ -77,14 +68,6 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # Source coverage parsing helper
 source "$PROJECT_ROOT/scripts/parse-coverage.sh"
 
-# Debug logging (optional, controlled by DEBUG_POST_SUMMARY env var)
-DEBUG_LOG=".claude/post-summary-debug.log"
-log_debug() {
-  if [ "$DEBUG_POST_SUMMARY" = "true" ]; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$DEBUG_LOG"
-  fi
-}
-
 # Check if auto-commenting is disabled
 if [ "$DISABLE_AUTO_COMMENT" = "true" ]; then
   echo "ℹ️  Auto-commenting is disabled (DISABLE_AUTO_COMMENT=true)"
@@ -94,106 +77,29 @@ fi
 
 # Get branch info
 BRANCH=$(git branch --show-current 2>/dev/null || echo "")
-ISSUE_NUM=$(echo "$BRANCH" | grep -oP '\d+' | head -1 || echo "")
+ISSUE_NUM=$(echo "$BRANCH" | grep -oP '(?:feature|fix|issue|refactor|chore)/(\d+)' | grep -oP '\d+' || echo "")
 PR_NUM=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
 
 if [ -z "$ISSUE_NUM" ] && [ -z "$PR_NUM" ]; then
-  echo "❌ No issue or PR found (branch: $BRANCH)"
-  echo "   Branch name should contain issue number (e.g., feature/21-description)"
+  echo "❌ No issue or PR found"
   exit 1
 fi
 
 # Get user input
-# Supports 3 formats:
-#   2 params (AUTO with priority chain): post-summary.sh "request" "achievement"
-#      → Automatically detects prompt from multiple sources
-#   3 params (MANUAL override): post-summary.sh "actual_prompt" "request" "achievement"
-#      → Uses provided actual_prompt (highest priority)
-#   0 params (INTERACTIVE): Prompts for all inputs
-#
-# Prompt Source Priority (automatic in 2-param mode):
-#   1. Explicit 3rd parameter (manual override)
-#   2. .claude/prompt-history.json (fresh session, hook captured)
-#   3. .claude-prompt-issue-{NUM}.md (workflow file, survives resumption)
-#   4. Skip Actual Prompt section (no source found)
+# Supports 2 formats:
+#   2 params (backward compatible): post-summary.sh "request" "achievement"
+#   3 params (new format): post-summary.sh "actual_prompt" "request" "achievement"
 if [ -n "$1" ]; then
   if [ -n "$3" ]; then
-    # 3 parameters: manual override with explicit actual prompt (PRIORITY 1)
+    # 3 parameters: new format with actual prompt
     ACTUAL_PROMPT="$1"
     USER_PROMPT="$2"
     ACHIEVEMENT="$3"
-    PROMPT_SOURCE="manual-override"
   else
-    # 2 parameters: AUTO MODE with priority chain
+    # 2 parameters: backward compatible (no actual prompt)
+    ACTUAL_PROMPT=""
     USER_PROMPT="$1"
     ACHIEVEMENT="$2"
-    ACTUAL_PROMPT=""
-    PROMPT_SOURCE="none"
-
-    log_debug "=== Prompt Detection Start ==="
-    log_debug "Branch: $BRANCH"
-    log_debug "Issue Number: $ISSUE_NUM"
-
-    # PRIORITY 2: Try to read last prompt from history file (fresh session)
-    HISTORY_FILE=".claude/prompt-history.json"
-    log_debug "Checking prompt history: $HISTORY_FILE"
-    if [ -f "$HISTORY_FILE" ]; then
-      log_debug "History file exists"
-      if command -v jq &> /dev/null; then
-        # Validate prompt is for current issue (critical: prevents using stale prompts from other issues)
-        HISTORY_ISSUE=$(jq -r '.prompts[-1].issueNumber // ""' "$HISTORY_FILE" 2>/dev/null || echo "")
-        HISTORY_PROMPT=$(jq -r '.prompts[-1].prompt // ""' "$HISTORY_FILE" 2>/dev/null || echo "")
-
-        if [ -n "$HISTORY_PROMPT" ] && [ "$HISTORY_ISSUE" = "$ISSUE_NUM" ]; then
-          ACTUAL_PROMPT="$HISTORY_PROMPT"
-          PROMPT_SOURCE="prompt-history"
-          log_debug "SUCCESS: Loaded from prompt history (${#ACTUAL_PROMPT} chars, issue $HISTORY_ISSUE)"
-          echo "✓ Loaded prompt from history (fresh session capture)"
-        elif [ -n "$HISTORY_PROMPT" ] && [ "$HISTORY_ISSUE" != "$ISSUE_NUM" ]; then
-          log_debug "History prompt is for different issue ($HISTORY_ISSUE vs $ISSUE_NUM), skipping"
-          echo "⚠️  History has stale prompt from issue #${HISTORY_ISSUE}, skipping"
-        else
-          log_debug "History file empty or invalid"
-        fi
-      else
-        log_debug "jq not available (install with: apt-get install jq)"
-        echo "⚠️  jq not installed, cannot read prompt history (install with: apt-get install jq)"
-      fi
-    else
-      log_debug "History file not found"
-    fi
-
-    # PRIORITY 3: Check for workflow prompt file (survives resumption)
-    if [ -z "$ACTUAL_PROMPT" ] && [ -n "$ISSUE_NUM" ]; then
-      WORKFLOW_PROMPT_FILE=".claude-prompt-issue-${ISSUE_NUM}.md"
-      log_debug "Checking workflow file: $WORKFLOW_PROMPT_FILE"
-      if [ -f "$WORKFLOW_PROMPT_FILE" ]; then
-        # Security: Validate file size before reading (1MB limit)
-        FILE_SIZE=$(stat -f%z "$WORKFLOW_PROMPT_FILE" 2>/dev/null || stat -c%s "$WORKFLOW_PROMPT_FILE" 2>/dev/null)
-        if [ "$FILE_SIZE" -gt 1048576 ]; then  # 1MB = 1048576 bytes
-          log_debug "Workflow file too large: ${FILE_SIZE} bytes (limit: 1MB)"
-          echo "⚠️  Workflow file too large (${FILE_SIZE} bytes), skipping"
-        else
-          ACTUAL_PROMPT=$(cat "$WORKFLOW_PROMPT_FILE")
-          PROMPT_SOURCE="workflow-file"
-          log_debug "SUCCESS: Loaded from workflow file (${#ACTUAL_PROMPT} chars)"
-          echo "✓ Loaded prompt from workflow file: $WORKFLOW_PROMPT_FILE"
-        fi
-      else
-        log_debug "Workflow file not found"
-      fi
-    elif [ -z "$ACTUAL_PROMPT" ]; then
-      log_debug "Skipping workflow file check (no issue number)"
-    fi
-
-    # PRIORITY 4: No source found (will skip Actual Prompt section)
-    if [ -z "$ACTUAL_PROMPT" ]; then
-      log_debug "RESULT: No prompt found (all sources exhausted)"
-      echo "ℹ️  No prompt found (tried history + workflow file)"
-      PROMPT_SOURCE="none"
-    fi
-
-    log_debug "=== Prompt Detection End (source: $PROMPT_SOURCE) ==="
   fi
 else
   # Interactive mode
@@ -203,7 +109,6 @@ else
   read -r USER_PROMPT
   echo "What was achieved?"
   read -r ACHIEVEMENT
-  PROMPT_SOURCE="interactive"
 fi
 
 # Function to format Actual Prompt section
