@@ -94,11 +94,12 @@ fi
 
 # Get branch info
 BRANCH=$(git branch --show-current 2>/dev/null || echo "")
-ISSUE_NUM=$(echo "$BRANCH" | grep -oP '(?:feature|fix|issue|refactor|chore)/(\d+)' | grep -oP '\d+' || echo "")
+ISSUE_NUM=$(echo "$BRANCH" | grep -oP '\d+' | head -1 || echo "")
 PR_NUM=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
 
 if [ -z "$ISSUE_NUM" ] && [ -z "$PR_NUM" ]; then
-  echo "❌ No issue or PR found"
+  echo "❌ No issue or PR found (branch: $BRANCH)"
+  echo "   Branch name should contain issue number (e.g., feature/21-description)"
   exit 1
 fi
 
@@ -149,7 +150,8 @@ if [ -n "$1" ]; then
           log_debug "History file empty or invalid"
         fi
       else
-        log_debug "jq not available"
+        log_debug "jq not available (install with: apt-get install jq)"
+        echo "⚠️  jq not installed, cannot read prompt history (install with: apt-get install jq)"
       fi
     else
       log_debug "History file not found"
@@ -160,17 +162,22 @@ if [ -n "$1" ]; then
       WORKFLOW_PROMPT_FILE=".claude-prompt-issue-${ISSUE_NUM}.md"
       log_debug "Checking workflow file: $WORKFLOW_PROMPT_FILE"
       if [ -f "$WORKFLOW_PROMPT_FILE" ]; then
-        ACTUAL_PROMPT=$(cat "$WORKFLOW_PROMPT_FILE")
-        PROMPT_SOURCE="workflow-file"
-        log_debug "SUCCESS: Loaded from workflow file (${#ACTUAL_PROMPT} chars)"
-        echo "✓ Loaded prompt from workflow file: $WORKFLOW_PROMPT_FILE"
+        # Security: Validate file size before reading (1MB limit)
+        FILE_SIZE=$(stat -f%z "$WORKFLOW_PROMPT_FILE" 2>/dev/null || stat -c%s "$WORKFLOW_PROMPT_FILE" 2>/dev/null)
+        if [ "$FILE_SIZE" -gt 1048576 ]; then  # 1MB = 1048576 bytes
+          log_debug "Workflow file too large: ${FILE_SIZE} bytes (limit: 1MB)"
+          echo "⚠️  Workflow file too large (${FILE_SIZE} bytes), skipping"
+        else
+          ACTUAL_PROMPT=$(cat "$WORKFLOW_PROMPT_FILE")
+          PROMPT_SOURCE="workflow-file"
+          log_debug "SUCCESS: Loaded from workflow file (${#ACTUAL_PROMPT} chars)"
+          echo "✓ Loaded prompt from workflow file: $WORKFLOW_PROMPT_FILE"
+        fi
       else
         log_debug "Workflow file not found"
       fi
-    else
-      if [ -z "$ACTUAL_PROMPT" ]; then
-        log_debug "Skipping workflow file check (no issue number)"
-      fi
+    elif [ -z "$ACTUAL_PROMPT" ]; then
+      log_debug "Skipping workflow file check (no issue number)"
     fi
 
     # PRIORITY 4: No source found (will skip Actual Prompt section)

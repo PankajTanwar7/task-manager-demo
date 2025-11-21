@@ -142,3 +142,4 @@ vite.config.ts.timestamp-*
 .claude/session-counter.json
 .claude-prompt-*.md
 docs/dev-logs/
+*.backup
