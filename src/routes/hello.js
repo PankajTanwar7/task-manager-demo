@@ -21,7 +21,7 @@ const router = express.Router();
  */
 router.get('/', (req, res) => {
   try {
-    res.json({
+    res.status(200).json({
       success: true,
       message: 'Hello, World!',
       timestamp: new Date().toISOString()
