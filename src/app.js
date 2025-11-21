@@ -24,6 +24,7 @@ const taskRoutes = require('./routes/tasks');
 const healthRoutes = require('./routes/health');
 const helloRoutes = require('./routes/hello');
 const errorHandler = require('./middleware/errorHandler');
+const requestLogger = require('./middleware/requestLogger');
 
 const app = express();
 
@@ -80,6 +81,12 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+
+/**
+ * Request logging middleware
+ * Logs all requests except /health (to reduce noise)
+ */
+app.use(requestLogger);
 
 /**
  * Mount route handlers

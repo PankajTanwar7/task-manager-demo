@@ -125,7 +125,30 @@ extract_trigger_prompt() {
     # Method 1: Claude Code prompt history (highest priority for local development)
     local prompt_history_file=".claude/prompt-history.json"
     if [ -f "$prompt_history_file" ]; then
-        # Get the most recent prompt for this branch
+        # Get commit timestamp
+        local commit_timestamp
+        commit_timestamp=$(git log -1 --format=%ct 2>/dev/null)
+
+        if [ -n "$commit_timestamp" ]; then
+            # Find prompt closest to (but before) commit time
+            local matched_prompt
+            matched_prompt=$(jq -r --arg branch "$BRANCH" --arg commit_ts "$commit_timestamp" '
+                .prompts[]?
+                | select(.branch == $branch)
+                | . as $p
+                | ($p.timestamp | sub(" "; "T") | sub("$"; "Z") | fromdateiso8601) as $prompt_ts
+                | select($prompt_ts <= ($commit_ts | tonumber))
+                | {prompt: $p.prompt, diff: (($commit_ts | tonumber) - $prompt_ts)}
+            ' "$prompt_history_file" 2>/dev/null | jq -s 'sort_by(.diff) | .[0].prompt' 2>/dev/null)
+
+            if [ -n "$matched_prompt" ] && [ "$matched_prompt" != "null" ]; then
+                TRIGGER_PROMPT="$matched_prompt"
+                print_success "Captured prompt from Claude Code history (matched by timestamp)"
+                return 0
+            fi
+        fi
+
+        # Fallback: Get most recent prompt for this branch
         local recent_prompt
         recent_prompt=$(jq -r --arg branch "$BRANCH" '
             .prompts[]? | select(.branch == $branch) | .prompt
@@ -152,7 +175,27 @@ extract_trigger_prompt() {
         fi
     fi
 
-    # Method 3: GitHub API (fallback for @claude mentions)
+    # Method 3: Workflow file (for start-work.sh generated prompts)
+    if [ -n "$target_num" ]; then
+        local workflow_file=".claude-prompt-issue-${target_num}.md"
+        if [ -f "$workflow_file" ]; then
+            # Check file size (max 1MB for safety)
+            local file_size
+            file_size=$(stat -f%z "$workflow_file" 2>/dev/null || stat -c%s "$workflow_file" 2>/dev/null || echo "0")
+            if [ "$file_size" -gt 1048576 ]; then
+                print_warning "Workflow file too large (${file_size} bytes), skipping"
+            else
+                # Read the full workflow file
+                TRIGGER_PROMPT=$(cat "$workflow_file")
+                if [ -n "$TRIGGER_PROMPT" ]; then
+                    print_success "Captured prompt from workflow file ($workflow_file)"
+                    return 0
+                fi
+            fi
+        fi
+    fi
+
+    # Method 4: GitHub API (fallback for @claude mentions)
     if [ "$target_type" = "pr" ]; then
         local pr_comments
         pr_comments=$(gh pr view "$target_num" --json comments --jq '.comments | reverse | .[] | select(.body | contains("@claude")) | .body' 2>/dev/null | head -1)

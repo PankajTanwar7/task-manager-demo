@@ -1,0 +1,31 @@
+Timestamp-Based Prompt Matching Test
+=====================================
+
+This file exists to test that commits are matched to the correct prompt
+based on timestamp proximity.
+
+Test Scenario:
+--------------
+- prompt-history.json contains 3 prompts at different times
+- This commit should match to the THIRD prompt (most recent one before commit)
+- Previous algorithm would always show the last prompt
+- New algorithm finds the closest prompt before commit time
+
+Expected Result:
+----------------
+The auto-generated comment should show:
+"Third test prompt: Create a simple test file to validate timestamp-based prompt matching works correctly"
+
+NOT the other two prompts!
+
+Test Status:
+------------
+- Commit 1: No prompts existed yet (showed default)
+- Commit 2-3: Wrong dates - all prompts were on Nov 22, commits on Nov 21
+  → Result: ❌ Fell back to tail -1 (showed wrong prompts)
+- Commit 4: Fixed dates to Nov 21 (17:20, 17:40, 17:50, 18:30)
+  → Expected: Should match to 17:50 prompt (third one)
+  → Commit time: ~17:54 UTC
+  → Should IGNORE 18:30 prompt (future)
+  → Manual test: ✅ jq query returns correct prompt!
+  → Now testing in real hook...
