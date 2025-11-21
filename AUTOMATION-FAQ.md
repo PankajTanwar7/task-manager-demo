@@ -226,6 +226,145 @@ git checkout fix/20-bug-fix
 
 ---
 
+## Q10: How do I enable test coverage reporting?
+
+**Answer:** Coverage reporting is automatically enabled when coverage data is available.
+
+### Enable Coverage:
+```bash
+# Run tests with coverage flag
+npm test -- --coverage
+
+# Or use the test:coverage script
+npm run test:coverage
+```
+
+### How It Works:
+1. Jest generates `coverage/coverage-summary.json` when you run tests with `--coverage`
+2. The automation system detects this file automatically
+3. Coverage section appears in your GitHub comments (Issues and PRs)
+4. If coverage file doesn't exist, the section is silently skipped (no errors)
+
+### What's Included:
+- Overall coverage percentage (lines, statements, functions, branches)
+- Files needing attention (<80% coverage)
+- Well-covered files (≥80% coverage)
+- Trend indicators (+/- from previous response)
+
+### Example Output:
+```markdown
+### Test Coverage
+
+<details>
+<summary>86.01% overall coverage</summary>
+
+**Files needing attention (<80%):**
+- `src/middleware/errorHandler.js` - 42.85%
+- `src/utils/logger.js` - 57.14%
+
+**Well covered (≥80%):**
+- `src/routes/tasks.js` - 100%
+- `src/controllers/taskController.js` - 85.29%
+
+**Overall Statistics:**
+- Lines: 86.01% (123/143)
+- Statements: 86.66% (130/150)
+- Functions: 76.66% (23/30)
+- Branches: 55.76% (29/52)
+</details>
+```
+
+**Key Point:** No configuration needed - just run tests with `--coverage`!
+
+---
+
+## Q11: Why isn't my coverage showing up in comments?
+
+**Answer:** Coverage section appears only when coverage data is **available and recent**.
+
+### Common Reasons:
+
+**1. Coverage Not Generated:**
+```bash
+# Wrong: no coverage generated
+npm test
+
+# Correct: generates coverage
+npm test -- --coverage
+```
+
+**2. Coverage File Too Old:**
+- Coverage must be generated within the last 24 hours
+- Solution: Run tests with coverage again
+
+**3. Wrong Project Setup:**
+- Project must use Jest (or compatible test framework)
+- `coverage/coverage-summary.json` must exist
+
+### Troubleshooting:
+```bash
+# Check if coverage file exists
+ls -la coverage/coverage-summary.json
+
+# Check file age
+stat coverage/coverage-summary.json
+
+# Regenerate coverage
+npm test -- --coverage
+
+# Test coverage parsing
+source scripts/parse-coverage.sh
+parse_coverage_section ".claude/session-counter.json" "test" "1"
+```
+
+**Key Point:** Coverage is optional - if unavailable, comments work normally without it!
+
+---
+
+## Q12: How do I change the coverage threshold?
+
+**Answer:** Use the `COVERAGE_THRESHOLD` environment variable (default: 80%).
+
+### Change Threshold:
+```bash
+# Set threshold to 90%
+export COVERAGE_THRESHOLD=90
+
+# Now files below 90% will be listed as "needing attention"
+./.claude/hooks/post-summary.sh "..." "..."
+
+# Reset to default (80%)
+unset COVERAGE_THRESHOLD
+```
+
+### Permanent Change:
+Add to your `.bashrc` or `.zshrc`:
+```bash
+# ~/.bashrc
+export COVERAGE_THRESHOLD=90
+```
+
+### How It Works:
+- Files below threshold: Listed as "Files needing attention"
+- Files at/above threshold: Listed as "Well covered"
+- Default: 80% (industry standard)
+
+### Examples:
+```bash
+# Strict (95%)
+export COVERAGE_THRESHOLD=95
+
+# Moderate (80%) - default
+export COVERAGE_THRESHOLD=80
+
+# Lenient (70%)
+export COVERAGE_THRESHOLD=70
+```
+
+**Key Point:** The threshold only affects how files are categorized in the report!
+
+---
+
 ## Summary
 
 | Question | Answer |
@@ -237,6 +376,9 @@ git checkout fix/20-bug-fix
 | How are numbers tracked? | `.claude/session-counter.json` |
 | Can I work on multiple issues? | Yes, switch branches |
 | Can I work on multiple PRs? | Yes, switch branches - same as issues |
+| How to enable coverage reporting? | Run `npm test -- --coverage` |
+| Why isn't coverage showing? | Check coverage file exists and is <24h old |
+| How to change coverage threshold? | Set `COVERAGE_THRESHOLD` env variable (default: 80) |
 
 ---
 
