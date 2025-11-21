@@ -550,4 +550,282 @@ describe('Task API Endpoints', () => {
       expect(res.body.success).toBe(false);
     });
   });
+
+  describe('completedAt timestamp', () => {
+    /**
+     * Test basic completedAt functionality
+     * Verifies: completedAt is set when marking task as completed
+     */
+    it('should set completedAt when marking task as completed', async () => {
+      // Create a task
+      const createRes = await request(app)
+        .post('/api/tasks')
+        .send({ title: 'Test Task', description: 'Description' });
+      const taskId = createRes.body.data.id;
+
+      // Mark as completed
+      const updateRes = await request(app)
+        .put(`/api/tasks/${taskId}`)
+        .send({ completed: true });
+
+      expect(updateRes.statusCode).toBe(200);
+      expect(updateRes.body.success).toBe(true);
+      expect(updateRes.body.data.completed).toBe(true);
+      expect(updateRes.body.data.completedAt).not.toBeNull();
+      expect(updateRes.body.data.completedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/); // ISO 8601 format
+    });
+
+    /**
+     * Test that completedAt is null for new incomplete tasks
+     * Verifies: completedAt initializes as null
+     */
+    it('should have completedAt as null for new incomplete tasks', async () => {
+      const res = await request(app)
+        .post('/api/tasks')
+        .send({ title: 'Test Task', description: 'Description' });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.body.data.completed).toBe(false);
+      expect(res.body.data.completedAt).toBeNull();
+    });
+
+    /**
+     * Test completedAt preservation when uncompleting
+     * Verifies: completedAt is preserved when task is marked incomplete (for history)
+     */
+    it('should preserve completedAt when marking task as incomplete', async () => {
+      // Create and complete a task
+      const createRes = await request(app)
+        .post('/api/tasks')
+        .send({ title: 'Test Task', description: 'Description' });
+      const taskId = createRes.body.data.id;
+
+      await request(app)
+        .put(`/api/tasks/${taskId}`)
+        .send({ completed: true });
+
+      // Get the completedAt timestamp
+      const getRes1 = await request(app).get(`/api/tasks/${taskId}`);
+      const originalCompletedAt = getRes1.body.data.completedAt;
+      expect(originalCompletedAt).not.toBeNull();
+
+      // Mark as incomplete
+      const updateRes = await request(app)
+        .put(`/api/tasks/${taskId}`)
+        .send({ completed: false });
+
+      expect(updateRes.statusCode).toBe(200);
+      expect(updateRes.body.data.completed).toBe(false);
+      expect(updateRes.body.data.completedAt).toBe(originalCompletedAt); // Preserved
+    });
+
+    /**
+     * Test completedAt update when re-completing
+     * Verifies: completedAt gets new timestamp when task is completed again
+     */
+    it('should update completedAt when re-completing a task', async () => {
+      // Create and complete a task
+      const createRes = await request(app)
+        .post('/api/tasks')
+        .send({ title: 'Test Task', description: 'Description' });
+      const taskId = createRes.body.data.id;
+
+      await request(app)
+        .put(`/api/tasks/${taskId}`)
+        .send({ completed: true });
+
+      const getRes1 = await request(app).get(`/api/tasks/${taskId}`);
+      const firstCompletedAt = getRes1.body.data.completedAt;
+
+      // Uncomplete then complete again
+      await request(app)
+        .put(`/api/tasks/${taskId}`)
+        .send({ completed: false });
+
+      // Wait a bit to ensure different timestamp
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      await request(app)
+        .put(`/api/tasks/${taskId}`)
+        .send({ completed: true });
+
+      const getRes2 = await request(app).get(`/api/tasks/${taskId}`);
+      const secondCompletedAt = getRes2.body.data.completedAt;
+
+      expect(secondCompletedAt).not.toBe(firstCompletedAt); // New timestamp
+      expect(new Date(secondCompletedAt) >= new Date(firstCompletedAt)).toBe(true);
+    });
+
+    /**
+     * Test completedAt stability when updating other fields
+     * Verifies: completedAt doesn't change when updating title/description
+     */
+    it('should not change completedAt when updating other fields', async () => {
+      // Create and complete a task
+      const createRes = await request(app)
+        .post('/api/tasks')
+        .send({ title: 'Test Task', description: 'Description' });
+      const taskId = createRes.body.data.id;
+
+      await request(app)
+        .put(`/api/tasks/${taskId}`)
+        .send({ completed: true });
+
+      const getRes1 = await request(app).get(`/api/tasks/${taskId}`);
+      const originalCompletedAt = getRes1.body.data.completedAt;
+
+      // Update title and description (not completed field)
+      await request(app)
+        .put(`/api/tasks/${taskId}`)
+        .send({ title: 'Updated Title', description: 'Updated Description' });
+
+      const getRes2 = await request(app).get(`/api/tasks/${taskId}`);
+      expect(getRes2.body.data.completedAt).toBe(originalCompletedAt); // Unchanged
+    });
+
+    /**
+     * Test security: reject manual completedAt in create request
+     * Verifies: 400 error when trying to set completedAt manually during creation
+     */
+    it('should reject manual completedAt in create request', async () => {
+      const res = await request(app)
+        .post('/api/tasks')
+        .send({
+          title: 'Test Task',
+          description: 'Description',
+          completedAt: '2025-11-21T10:00:00Z'
+        });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toBe('completedAt is a read-only field and cannot be set manually');
+    });
+
+    /**
+     * Test security: reject manual completedAt in update request
+     * Verifies: 400 error when trying to set completedAt manually during update
+     */
+    it('should reject manual completedAt in update request', async () => {
+      // Create a task first
+      const createRes = await request(app)
+        .post('/api/tasks')
+        .send({ title: 'Test Task', description: 'Description' });
+      const taskId = createRes.body.data.id;
+
+      // Try to manually set completedAt
+      const res = await request(app)
+        .put(`/api/tasks/${taskId}`)
+        .send({
+          completed: true,
+          completedAt: '2025-11-21T10:00:00Z'
+        });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toBe('completedAt is a read-only field and cannot be set manually');
+    });
+
+    /**
+     * Test completedAt timestamp accuracy
+     * Verifies: completedAt is set to current time (within 1 second tolerance)
+     */
+    it('should set completedAt to current time when completed', async () => {
+      const beforeTime = new Date();
+
+      const createRes = await request(app)
+        .post('/api/tasks')
+        .send({ title: 'Test Task', description: 'Description' });
+      const taskId = createRes.body.data.id;
+
+      await request(app)
+        .put(`/api/tasks/${taskId}`)
+        .send({ completed: true });
+
+      const afterTime = new Date();
+
+      const getRes = await request(app).get(`/api/tasks/${taskId}`);
+      const completedAt = new Date(getRes.body.data.completedAt);
+
+      // Allow 1 second tolerance for test execution time
+      expect(completedAt >= new Date(beforeTime.getTime() - 1000)).toBe(true);
+      expect(completedAt <= new Date(afterTime.getTime() + 1000)).toBe(true);
+    });
+
+    /**
+     * Test completedAt in GET /api/tasks response
+     * Verifies: completedAt field is included in list response
+     */
+    it('should include completedAt in GET /api/tasks response', async () => {
+      // Create one incomplete and one complete task
+      await request(app)
+        .post('/api/tasks')
+        .send({ title: 'Incomplete Task', description: 'Description' });
+
+      const createRes = await request(app)
+        .post('/api/tasks')
+        .send({ title: 'Complete Task', description: 'Description' });
+
+      await request(app)
+        .put(`/api/tasks/${createRes.body.data.id}`)
+        .send({ completed: true });
+
+      // Get all tasks
+      const res = await request(app).get('/api/tasks');
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.data).toHaveLength(2);
+      expect(res.body.data[0]).toHaveProperty('completedAt');
+      expect(res.body.data[1]).toHaveProperty('completedAt');
+    });
+
+    /**
+     * Test completedAt in GET /api/tasks/:id response
+     * Verifies: completedAt field is included in single task response
+     */
+    it('should include completedAt in GET /api/tasks/:id response', async () => {
+      const createRes = await request(app)
+        .post('/api/tasks')
+        .send({ title: 'Test Task', description: 'Description' });
+      const taskId = createRes.body.data.id;
+
+      const res = await request(app).get(`/api/tasks/${taskId}`);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.data).toHaveProperty('completedAt');
+      expect(res.body.data.completedAt).toBeNull(); // New task is incomplete
+    });
+
+    /**
+     * Test completedAt in POST response
+     * Verifies: completedAt is included in create response
+     */
+    it('should include completedAt in POST response', async () => {
+      const res = await request(app)
+        .post('/api/tasks')
+        .send({ title: 'Test Task', description: 'Description' });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.body.data).toHaveProperty('completedAt');
+      expect(res.body.data.completedAt).toBeNull();
+    });
+
+    /**
+     * Test completedAt in PUT response
+     * Verifies: completedAt is included in update response
+     */
+    it('should include completedAt in PUT response', async () => {
+      const createRes = await request(app)
+        .post('/api/tasks')
+        .send({ title: 'Test Task', description: 'Description' });
+      const taskId = createRes.body.data.id;
+
+      const res = await request(app)
+        .put(`/api/tasks/${taskId}`)
+        .send({ completed: true });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.data).toHaveProperty('completedAt');
+      expect(res.body.data.completedAt).not.toBeNull();
+    });
+  });
 });
