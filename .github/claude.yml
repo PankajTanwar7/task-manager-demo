@@ -1,11 +1,17 @@
 # GitHub Claude Configuration
-# This disables automatic GitHub Claude responses
+# Enable auto-responses for architecture discussions only
 
-# Disable auto-responses to @claude mentions
-auto_respond: false
+# Enable auto-responses to @claude mentions
+auto_respond: true
 
-# Only respond when explicitly requested via workflow
-manual_only: true
+# Allow automatic responses for design discussions
+manual_only: false
 
-# Note: We use Claude Code CLI for implementation
-# GitHub @claude integration is disabled to prevent conflicts
+# IMPORTANT: GitHub @claude should provide SUGGESTIONS ONLY
+# - Respond with architecture recommendations
+# - Discuss design decisions and trade-offs
+# - Provide technical guidance
+# - DO NOT implement code directly
+# - DO NOT push commits
+#
+# Code implementation is done via Claude Code CLI workflow

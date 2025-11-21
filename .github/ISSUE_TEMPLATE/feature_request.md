@@ -24,6 +24,8 @@ assignees: ''
 
 <!-- Key decisions that need to be made during implementation -->
 
+**@claude Please provide architecture recommendations and design guidance (suggestions only, do not implement code):**
+
 **Questions to consider:**
 1.
 2.
