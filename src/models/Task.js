@@ -15,6 +15,7 @@ class Task {
     this.title = title;
     this.description = description || '';
     this.completed = false;
+    this.completedAt = null; // Timestamp when task was last marked as completed
     // Use single timestamp for consistency
     const now = new Date().toISOString();
     this.createdAt = now;
@@ -68,9 +69,20 @@ class Task {
     const task = this.findById(id);
     if (!task) return null;
 
+    // Track previous completed state for business logic
+    const wasCompleted = task.completed;
+
     if (updates.title !== undefined) task.title = updates.title;
     if (updates.description !== undefined) task.description = updates.description;
-    if (updates.completed !== undefined) task.completed = updates.completed;
+    if (updates.completed !== undefined) {
+      task.completed = updates.completed;
+
+      // Business logic: set completedAt when marking task as complete
+      // Preserve existing completedAt when uncompleting (for history)
+      if (!wasCompleted && task.completed) {
+        task.completedAt = new Date().toISOString();
+      }
+    }
 
     // Update timestamp
     task.updatedAt = new Date().toISOString();

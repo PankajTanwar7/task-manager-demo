@@ -51,6 +51,14 @@ exports.validateCreateTask = [
    * Returns 400 with detailed error array if validation fails
    */
   (req, res, next) => {
+    // Security: Reject manual completedAt (read-only field)
+    if (req.body.completedAt !== undefined) {
+      return res.status(400).json({
+        success: false,
+        error: 'completedAt is a read-only field and cannot be set manually'
+      });
+    }
+
     const errors = validationResult(req);
 
     if (!errors.isEmpty()) {
@@ -104,6 +112,14 @@ exports.validateUpdateTask = [
    * Returns 400 if validation fails or if all fields are undefined (empty update)
    */
   (req, res, next) => {
+    // Security: Reject manual completedAt (read-only field)
+    if (req.body.completedAt !== undefined) {
+      return res.status(400).json({
+        success: false,
+        error: 'completedAt is a read-only field and cannot be set manually'
+      });
+    }
+
     const errors = validationResult(req);
 
     if (!errors.isEmpty()) {
