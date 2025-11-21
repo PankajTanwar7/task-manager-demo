@@ -128,7 +128,7 @@ extract_trigger_prompt() {
         # Get the most recent prompt for this branch
         local recent_prompt
         recent_prompt=$(jq -r --arg branch "$BRANCH" '
-            .[] | select(.branch == $branch) | .prompt
+            .prompts[]? | select(.branch == $branch) | .prompt
         ' "$prompt_history_file" 2>/dev/null | tail -1)
 
         if [ -n "$recent_prompt" ] && [ "$recent_prompt" != "null" ]; then
