@@ -999,4 +999,199 @@ describe('Task API Endpoints', () => {
       expect(res.body.data).toHaveLength(0);
     });
   });
+
+  describe('Sorting', () => {
+    beforeEach(async () => {
+      // Create tasks with varying properties for sorting tests
+      // Task 1: Older, title "Zebra Task"
+      await request(app)
+        .post('/api/tasks')
+        .send({ title: 'Zebra Task', description: 'Last alphabetically' });
+
+      // Wait 10ms to ensure different timestamps
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      // Task 2: Middle, title "Middle Task", will be completed
+      const task2 = await request(app)
+        .post('/api/tasks')
+        .send({ title: 'Middle Task', description: 'Will be completed' });
+
+      await request(app)
+        .put(`/api/tasks/${task2.body.data.id}`)
+        .send({ completed: true });
+
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      // Task 3: Newer, title "Alpha Task"
+      await request(app)
+        .post('/api/tasks')
+        .send({ title: 'Alpha Task', description: 'First alphabetically' });
+    });
+
+    it('should sort by createdAt ascending', async () => {
+      const res = await request(app)
+        .get('/api/tasks?sortBy=createdAt&sortOrder=asc')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveLength(3);
+      // Oldest first (Zebra Task)
+      expect(res.body.data[0].title).toBe('Zebra Task');
+      expect(res.body.data[2].title).toBe('Alpha Task');
+    });
+
+    it('should sort by createdAt descending (default)', async () => {
+      const res = await request(app)
+        .get('/api/tasks?sortBy=createdAt&sortOrder=desc')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveLength(3);
+      // Newest first (Alpha Task)
+      expect(res.body.data[0].title).toBe('Alpha Task');
+      expect(res.body.data[2].title).toBe('Zebra Task');
+    });
+
+    it('should sort by title ascending', async () => {
+      const res = await request(app)
+        .get('/api/tasks?sortBy=title&sortOrder=asc')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveLength(3);
+      expect(res.body.data[0].title).toBe('Alpha Task');
+      expect(res.body.data[1].title).toBe('Middle Task');
+      expect(res.body.data[2].title).toBe('Zebra Task');
+    });
+
+    it('should sort by title descending', async () => {
+      const res = await request(app)
+        .get('/api/tasks?sortBy=title&sortOrder=desc')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveLength(3);
+      expect(res.body.data[0].title).toBe('Zebra Task');
+      expect(res.body.data[1].title).toBe('Middle Task');
+      expect(res.body.data[2].title).toBe('Alpha Task');
+    });
+
+    it('should sort by completed status ascending (incomplete first)', async () => {
+      const res = await request(app)
+        .get('/api/tasks?sortBy=completed&sortOrder=asc')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveLength(3);
+      // First two should be incomplete
+      expect(res.body.data[0].completed).toBe(false);
+      expect(res.body.data[1].completed).toBe(false);
+      // Last one should be completed
+      expect(res.body.data[2].completed).toBe(true);
+      expect(res.body.data[2].title).toBe('Middle Task');
+    });
+
+    it('should sort by completed status descending (completed first)', async () => {
+      const res = await request(app)
+        .get('/api/tasks?sortBy=completed&sortOrder=desc')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveLength(3);
+      // First one should be completed
+      expect(res.body.data[0].completed).toBe(true);
+      expect(res.body.data[0].title).toBe('Middle Task');
+      // Last two should be incomplete
+      expect(res.body.data[1].completed).toBe(false);
+      expect(res.body.data[2].completed).toBe(false);
+    });
+
+    it('should handle case insensitive sortBy values', async () => {
+      const res = await request(app)
+        .get('/api/tasks?sortBy=TITLE&sortOrder=ASC')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data[0].title).toBe('Alpha Task');
+    });
+
+    it('should combine sorting with filtering', async () => {
+      const res = await request(app)
+        .get('/api/tasks?status=incomplete&sortBy=title&sortOrder=asc')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.count).toBe(2);
+      expect(res.body.data[0].title).toBe('Alpha Task');
+      expect(res.body.data[1].title).toBe('Zebra Task');
+      // All should be incomplete
+      expect(res.body.data.every(task => !task.completed)).toBe(true);
+    });
+
+    it('should combine sorting with pagination', async () => {
+      const res = await request(app)
+        .get('/api/tasks?sortBy=title&sortOrder=asc&page=1&limit=2')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveLength(2);
+      expect(res.body.data[0].title).toBe('Alpha Task');
+      expect(res.body.data[1].title).toBe('Middle Task');
+      expect(res.body.pagination.total).toBe(3);
+      expect(res.body.pagination.hasNextPage).toBe(true);
+    });
+
+    it('should use default sort (createdAt desc) when no sort params provided', async () => {
+      const res = await request(app)
+        .get('/api/tasks')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveLength(3);
+      // Should be newest first by default
+      expect(res.body.data[0].title).toBe('Alpha Task');
+      expect(res.body.data[2].title).toBe('Zebra Task');
+    });
+
+    it('should reject invalid sortBy values', async () => {
+      const res = await request(app)
+        .get('/api/tasks?sortBy=invalid')
+        .expect(400);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toBe('Invalid query parameters');
+      expect(res.body.details[0].field).toBe('sortBy');
+    });
+
+    it('should reject invalid sortOrder values', async () => {
+      const res = await request(app)
+        .get('/api/tasks?sortOrder=invalid')
+        .expect(400);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toBe('Invalid query parameters');
+      expect(res.body.details[0].field).toBe('sortOrder');
+    });
+
+    it('should sort by updatedAt when tasks are updated', async () => {
+      // Get all tasks to get their IDs
+      const allTasks = await request(app).get('/api/tasks');
+      const zebraTask = allTasks.body.data.find(t => t.title === 'Zebra Task');
+
+      // Wait and update the Zebra Task (oldest)
+      await new Promise(resolve => setTimeout(resolve, 10));
+      await request(app)
+        .put(`/api/tasks/${zebraTask.id}`)
+        .send({ description: 'Updated description' });
+
+      // Sort by updatedAt desc - Zebra Task should be first now
+      const res = await request(app)
+        .get('/api/tasks?sortBy=updatedAt&sortOrder=desc')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data[0].title).toBe('Zebra Task');
+      expect(res.body.data[0].description).toBe('Updated description');
+    });
+  });
 });
