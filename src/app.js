@@ -22,6 +22,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const taskRoutes = require('./routes/tasks');
 const healthRoutes = require('./routes/health');
+const helloRoutes = require('./routes/hello');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -83,9 +84,11 @@ app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 /**
  * Mount route handlers
  * - /api/tasks - Task management endpoints (CRUD operations)
+ * - /api/hello - Greeting endpoint for testing
  * - /health - Health check endpoint for monitoring
  */
 app.use('/api/tasks', taskRoutes);
+app.use('/api/hello', helloRoutes);
 app.use('/health', healthRoutes);
 
 
