@@ -124,9 +124,7 @@ Time: ${TIMESTAMP}
 
 ### Request
 
-\`\`\`
 ${USER_PROMPT}
-\`\`\`
 
 ---
 
@@ -143,7 +141,7 @@ ${ACHIEVEMENT}
   COVERAGE_SECTION=$(parse_coverage_section "$SESSION_FILE" "$COVERAGE_KEY" "$ISSUE_RESPONSE_NUM")
   [ -n "$COVERAGE_SECTION" ] && ISSUE_COMMENT="${ISSUE_COMMENT}${COVERAGE_SECTION}"
 
-  ISSUE_COMMENT="${ISSUE_COMMENT}### Files Changed
+  ISSUE_COMMENT="${ISSUE_COMMENT}### Files Changed in this Branch
 
 <details>
 <summary>${FILE_COUNT} files modified</summary>
@@ -171,7 +169,7 @@ ${ACHIEVEMENT}
 
 ---
 
-### Commits
+### Commits in this Branch
 
 \`\`\`
 ${COMMITS}
@@ -201,9 +199,7 @@ Time: ${TIMESTAMP}
 
 ### Request
 
-\`\`\`
 ${USER_PROMPT}
-\`\`\`
 
 ---
 
@@ -220,7 +216,7 @@ ${ACHIEVEMENT}
   COVERAGE_SECTION=$(parse_coverage_section "$SESSION_FILE" "$COVERAGE_KEY" "$PR_UPDATE_NUM")
   [ -n "$COVERAGE_SECTION" ] && PR_COMMENT="${PR_COMMENT}${COVERAGE_SECTION}"
 
-  PR_COMMENT="${PR_COMMENT}### Files Modified
+  PR_COMMENT="${PR_COMMENT}### Files Changed in this Branch
 
 <details>
 <summary>${FILE_COUNT} files changed</summary>
@@ -248,7 +244,7 @@ ${ACHIEVEMENT}
 
 ---
 
-### New Commits
+### All Commits in this Branch
 
 \`\`\`
 ${COMMITS}
