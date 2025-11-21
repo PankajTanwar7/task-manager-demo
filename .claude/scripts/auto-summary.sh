@@ -175,7 +175,27 @@ extract_trigger_prompt() {
         fi
     fi
 
-    # Method 3: GitHub API (fallback for @claude mentions)
+    # Method 3: Workflow file (for start-work.sh generated prompts)
+    if [ -n "$target_num" ]; then
+        local workflow_file=".claude-prompt-issue-${target_num}.md"
+        if [ -f "$workflow_file" ]; then
+            # Check file size (max 1MB for safety)
+            local file_size
+            file_size=$(stat -f%z "$workflow_file" 2>/dev/null || stat -c%s "$workflow_file" 2>/dev/null || echo "0")
+            if [ "$file_size" -gt 1048576 ]; then
+                print_warning "Workflow file too large (${file_size} bytes), skipping"
+            else
+                # Read the full workflow file
+                TRIGGER_PROMPT=$(cat "$workflow_file")
+                if [ -n "$TRIGGER_PROMPT" ]; then
+                    print_success "Captured prompt from workflow file ($workflow_file)"
+                    return 0
+                fi
+            fi
+        fi
+    fi
+
+    # Method 4: GitHub API (fallback for @claude mentions)
     if [ "$target_type" = "pr" ]; then
         local pr_comments
         pr_comments=$(gh pr view "$target_num" --json comments --jq '.comments | reverse | .[] | select(.body | contains("@claude")) | .body' 2>/dev/null | head -1)
