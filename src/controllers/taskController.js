@@ -107,6 +107,10 @@ exports.getAllTasks = (req, res, next) => {
     const hasNextPage = actualPage < totalPages;
     const hasPrevPage = actualPage > 1;
 
+    // Check if requested page is out of range
+    // Special case: if totalPages = 0 (empty list), page 1 is valid, not out of range
+    const outOfRange = totalPages > 0 && actualPage > totalPages;
+
     res.status(200).json({
       success: true,
       data: tasks,
@@ -116,7 +120,8 @@ exports.getAllTasks = (req, res, next) => {
         limit: actualLimit,
         totalPages,
         hasNextPage,
-        hasPrevPage
+        hasPrevPage,
+        outOfRange
       }
     });
   } catch (error) {

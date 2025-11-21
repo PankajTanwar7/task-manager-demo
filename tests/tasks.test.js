@@ -196,7 +196,8 @@ describe('Task API Endpoints', () => {
           limit: 5,
           totalPages: 3,
           hasNextPage: true,
-          hasPrevPage: false
+          hasPrevPage: false,
+          outOfRange: false
         });
 
         // Verify sorting: newest first (Task 12 should be first)
@@ -228,7 +229,8 @@ describe('Task API Endpoints', () => {
           limit: 5,
           totalPages: 3,
           hasNextPage: true,
-          hasPrevPage: true
+          hasPrevPage: true,
+          outOfRange: false
         });
 
         // Verify correct tasks on page 2 (Task 7-3, newest first)
@@ -260,7 +262,8 @@ describe('Task API Endpoints', () => {
           limit: 5,
           totalPages: 3,
           hasNextPage: false,
-          hasPrevPage: true
+          hasPrevPage: true,
+          outOfRange: false
         });
 
         // Verify last 2 tasks (Task 2, Task 1)
@@ -285,14 +288,15 @@ describe('Task API Endpoints', () => {
         expect(res.statusCode).toBe(200);
         expect(res.body.data).toEqual([]);
 
-        // Metadata should still be correct
+        // Metadata should indicate out of range
         expect(res.body.pagination).toEqual({
           total: 5,
           page: 10,
           limit: 10,
           totalPages: 1,
           hasNextPage: false,
-          hasPrevPage: true
+          hasPrevPage: true,
+          outOfRange: true
         });
       });
 
@@ -404,7 +408,8 @@ describe('Task API Endpoints', () => {
           limit: 10,
           totalPages: 0,
           hasNextPage: false,
-          hasPrevPage: false
+          hasPrevPage: false,
+          outOfRange: false
         });
       });
 
@@ -430,7 +435,92 @@ describe('Task API Endpoints', () => {
           limit: 10,
           totalPages: 2,
           hasNextPage: false,
-          hasPrevPage: true
+          hasPrevPage: true,
+          outOfRange: false
+        });
+      });
+
+      /**
+       * Edge case: outOfRange field behavior
+       * Test suite for the new outOfRange pagination field (Issue #20)
+       */
+      describe('outOfRange field edge cases', () => {
+        /**
+         * Verify outOfRange=true when requesting page beyond available pages
+         */
+        it('should set outOfRange=true when page exceeds totalPages', async () => {
+          // Create 15 tasks, with limit 10 → totalPages = 2
+          for (let i = 1; i <= 15; i++) {
+            Task.create(`Task ${i}`, `Description ${i}`);
+          }
+
+          // Request page 5 (exceeds totalPages of 2)
+          const res = await request(app)
+            .get('/api/tasks')
+            .query({ page: 5, limit: 10 });
+
+          expect(res.statusCode).toBe(200);
+          expect(res.body.data).toEqual([]);
+          expect(res.body.pagination.outOfRange).toBe(true);
+          expect(res.body.pagination.totalPages).toBe(2);
+          expect(res.body.pagination.page).toBe(5);
+        });
+
+        /**
+         * Verify outOfRange=false for valid pages
+         */
+        it('should set outOfRange=false for valid pages', async () => {
+          // Create 15 tasks, with limit 10 → totalPages = 2
+          for (let i = 1; i <= 15; i++) {
+            Task.create(`Task ${i}`, `Description ${i}`);
+          }
+
+          // Request page 1 (valid)
+          const res = await request(app)
+            .get('/api/tasks')
+            .query({ page: 1, limit: 10 });
+
+          expect(res.statusCode).toBe(200);
+          expect(res.body.data).toHaveLength(10);
+          expect(res.body.pagination.outOfRange).toBe(false);
+          expect(res.body.pagination.totalPages).toBe(2);
+        });
+
+        /**
+         * Verify empty task list is handled gracefully
+         * When there are 0 tasks (totalPages = 0), requesting page 1 should NOT be out of range
+         */
+        it('should handle empty task list gracefully', async () => {
+          // No tasks created (empty database)
+          const res = await request(app)
+            .get('/api/tasks')
+            .query({ page: 1, limit: 10 });
+
+          expect(res.statusCode).toBe(200);
+          expect(res.body.data).toEqual([]);
+          expect(res.body.pagination.outOfRange).toBe(false);
+          expect(res.body.pagination.totalPages).toBe(0);
+          expect(res.body.pagination.page).toBe(1);
+        });
+
+        /**
+         * Verify page=1 when totalPages=1 is valid (not out of range)
+         */
+        it('should handle page=1 when totalPages=1', async () => {
+          // Create exactly 5 tasks with limit 10 → totalPages = 1
+          for (let i = 1; i <= 5; i++) {
+            Task.create(`Task ${i}`, `Description ${i}`);
+          }
+
+          const res = await request(app)
+            .get('/api/tasks')
+            .query({ page: 1, limit: 10 });
+
+          expect(res.statusCode).toBe(200);
+          expect(res.body.data).toHaveLength(5);
+          expect(res.body.pagination.outOfRange).toBe(false);
+          expect(res.body.pagination.totalPages).toBe(1);
+          expect(res.body.pagination.page).toBe(1);
         });
       });
     });

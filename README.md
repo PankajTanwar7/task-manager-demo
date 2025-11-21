@@ -119,11 +119,16 @@ Create a new task.
 
 ```
 GET /api/tasks
+GET /api/tasks?page=1&limit=10
 ```
 
-Retrieve all tasks.
+Retrieve all tasks. Supports optional pagination.
 
-**Response (200):**
+**Query Parameters:**
+- `page` (optional): Page number (integer >= 1, default: returns all tasks)
+- `limit` (optional): Items per page (integer 1-100, default: 10 when page is provided)
+
+**Response without pagination (200):**
 ```json
 {
   "success": true,
@@ -133,11 +138,69 @@ Retrieve all tasks.
       "title": "Task title",
       "description": "Task description",
       "completed": false,
+      "completedAt": null,
       "createdAt": "2025-11-21T10:30:00.000Z",
       "updatedAt": "2025-11-21T10:30:00.000Z"
     }
   ],
   "count": 1
+}
+```
+
+**Response with pagination (200):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "title": "Task title",
+      "description": "Task description",
+      "completed": false,
+      "completedAt": null,
+      "createdAt": "2025-11-21T10:30:00.000Z",
+      "updatedAt": "2025-11-21T10:30:00.000Z"
+    }
+  ],
+  "pagination": {
+    "total": 25,
+    "page": 1,
+    "limit": 10,
+    "totalPages": 3,
+    "hasNextPage": true,
+    "hasPrevPage": false,
+    "outOfRange": false
+  }
+}
+```
+
+**Pagination Fields:**
+- `total`: Total number of tasks
+- `page`: Current page number
+- `limit`: Items per page
+- `totalPages`: Total number of pages
+- `hasNextPage`: True if there are more pages
+- `hasPrevPage`: True if there are previous pages
+- `outOfRange`: True if requested page exceeds totalPages (when data is empty)
+
+**Example - Out of Range Page:**
+```bash
+# If there are 25 tasks total, requesting page 10 returns:
+GET /api/tasks?page=10&limit=10
+```
+```json
+{
+  "success": true,
+  "data": [],
+  "pagination": {
+    "total": 25,
+    "page": 10,
+    "limit": 10,
+    "totalPages": 3,
+    "hasNextPage": false,
+    "hasPrevPage": true,
+    "outOfRange": true
+  }
 }
 ```
 
