@@ -97,6 +97,38 @@ app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
 /**
+ * JSON Error Handling Middleware
+ * Catches errors from express.json() parser and returns proper 400/413 errors
+ * instead of crashing with 500 errors
+ *
+ * Handles:
+ * - Malformed JSON syntax → 400 Bad Request
+ * - Oversized payloads → 413 Payload Too Large
+ */
+app.use((err, req, res, next) => {
+  // Handle JSON parsing errors
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid JSON in request body',
+      details: err.message
+    });
+  }
+
+  // Handle payload too large errors
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({
+      success: false,
+      error: 'Payload too large',
+      details: 'Request body exceeds the maximum allowed size of 10KB'
+    });
+  }
+
+  // Pass other errors to the next error handler
+  next(err);
+});
+
+/**
  * Request logging middleware
  * Logs all requests except /health (to reduce noise)
  */
