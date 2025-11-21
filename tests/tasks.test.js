@@ -939,7 +939,7 @@ describe('Task API Endpoints', () => {
       expect(res.body.pagination.hasNextPage).toBe(true);
     });
 
-    it.skip('should handle case insensitive status values', async () => {
+    it('should handle case insensitive status values', async () => {
       const res = await request(app)
         .get('/api/tasks?status=COMPLETED')
         .expect(200);

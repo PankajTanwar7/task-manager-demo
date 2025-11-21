@@ -15,6 +15,7 @@
  */
 
 const Task = require('../models/Task');
+const { matchedData } = require('express-validator');
 
 /**
  * Create a new task
@@ -80,11 +81,14 @@ exports.createTask = (req, res, next) => {
  */
 exports.getAllTasks = (req, res, next) => {
   try {
-    // Express-validator sanitizes and converts values
-    // Use the sanitized values from req.query (middleware updates them in place)
-    const page = req.query.page ? parseInt(req.query.page, 10) : undefined;
-    const limit = req.query.limit ? parseInt(req.query.limit, 10) : undefined;
-    const status = req.query.status || 'all'; // Already sanitized to lowercase by middleware
+    // Get validated and sanitized data from express-validator
+    // matchedData() returns only the fields that passed validation with sanitization applied
+    const validated = matchedData(req);
+
+    // Extract pagination and filter parameters with defaults
+    const page = validated.page; // Already converted to int by validator
+    const limit = validated.limit; // Already converted to int by validator
+    const status = validated.status || 'all'; // Already sanitized to lowercase by validator
 
     // If no pagination params, return all filtered tasks (backward compatibility)
     if (!page && !limit) {

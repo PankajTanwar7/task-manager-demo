@@ -216,12 +216,17 @@ exports.validatePagination = [
   query('status')
     .optional()
     .trim()
-    .customSanitizer(value => value ? value.toLowerCase() : 'all') // Convert to lowercase or default to 'all'
+    .customSanitizer(value => {
+      // Explicitly convert to lowercase or default to 'all'
+      const sanitized = value ? value.toLowerCase() : 'all';
+      return sanitized;
+    })
     .isIn(['all', 'completed', 'incomplete']).withMessage('Status must be one of: all, completed, incomplete'),
 
   /**
    * Middleware to check pagination and filter validation results
    * Returns 400 if query parameters are invalid
+   * Sanitized values should be accessed via matchedData() in the controller
    */
   (req, res, next) => {
     const errors = validationResult(req);
