@@ -85,6 +85,12 @@ fi
 BASE_BRANCH="main"
 COMMITS=$(git log --oneline ${BASE_BRANCH}..HEAD 2>/dev/null | head -10)
 COMMIT_COUNT=$(echo "$COMMITS" | wc -l)
+
+# Get files changed in latest commit only (incremental)
+LATEST_COMMIT_FILES=$(git diff --name-only HEAD~1..HEAD 2>/dev/null || git diff --name-only --cached 2>/dev/null)
+LATEST_FILE_COUNT=$(echo "$LATEST_COMMIT_FILES" | grep -v '^$' | wc -l)
+
+# Get all files changed in branch (cumulative)
 CHANGED_FILES=$(git diff --name-only ${BASE_BRANCH}...HEAD 2>/dev/null)
 FILE_COUNT=$(echo "$CHANGED_FILES" | grep -v '^$' | wc -l)
 
@@ -141,14 +147,36 @@ ${ACHIEVEMENT}
   COVERAGE_SECTION=$(parse_coverage_section "$SESSION_FILE" "$COVERAGE_KEY" "$ISSUE_RESPONSE_NUM")
   [ -n "$COVERAGE_SECTION" ] && ISSUE_COMMENT="${ISSUE_COMMENT}${COVERAGE_SECTION}"
 
-  ISSUE_COMMENT="${ISSUE_COMMENT}### Files Changed in this Branch
+  ISSUE_COMMENT="${ISSUE_COMMENT}### Files Changed in this Response
+
+<details>
+<summary>${LATEST_FILE_COUNT} files</summary>
+
+"
+
+  # Add latest commit files to issue comment
+  if [ $LATEST_FILE_COUNT -gt 0 ]; then
+    while IFS= read -r file; do
+      if [ -n "$file" ]; then
+        ISSUE_COMMENT="${ISSUE_COMMENT}- \`${file}\`
+"
+      fi
+    done < <(echo "$LATEST_COMMIT_FILES")
+  fi
+
+  ISSUE_COMMENT="${ISSUE_COMMENT}
+</details>
+
+---
+
+### All Files Changed in this Branch
 
 <details>
 <summary>Total: ${FILE_COUNT} files</summary>
 
 "
 
-  # Add files to issue comment (avoid subshell by not using pipe)
+  # Add all branch files to issue comment
   if [ $FILE_COUNT -gt 0 ]; then
     while IFS= read -r file; do
       if [ -n "$file" ]; then
@@ -216,14 +244,36 @@ ${ACHIEVEMENT}
   COVERAGE_SECTION=$(parse_coverage_section "$SESSION_FILE" "$COVERAGE_KEY" "$PR_UPDATE_NUM")
   [ -n "$COVERAGE_SECTION" ] && PR_COMMENT="${PR_COMMENT}${COVERAGE_SECTION}"
 
-  PR_COMMENT="${PR_COMMENT}### Files Changed in this Branch
+  PR_COMMENT="${PR_COMMENT}### Files Changed in this Update
+
+<details>
+<summary>${LATEST_FILE_COUNT} files</summary>
+
+"
+
+  # Add latest commit files to PR comment
+  if [ $LATEST_FILE_COUNT -gt 0 ]; then
+    while IFS= read -r file; do
+      if [ -n "$file" ]; then
+        PR_COMMENT="${PR_COMMENT}- \`${file}\`
+"
+      fi
+    done < <(echo "$LATEST_COMMIT_FILES")
+  fi
+
+  PR_COMMENT="${PR_COMMENT}
+</details>
+
+---
+
+### All Files Changed in this Branch
 
 <details>
 <summary>Total: ${FILE_COUNT} files</summary>
 
 "
 
-  # Add files to PR comment (avoid subshell by not using pipe)
+  # Add all branch files to PR comment
   if [ $FILE_COUNT -gt 0 ]; then
     while IFS= read -r file; do
       if [ -n "$file" ]; then
