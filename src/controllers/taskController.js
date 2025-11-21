@@ -80,13 +80,15 @@ exports.createTask = (req, res, next) => {
  */
 exports.getAllTasks = (req, res, next) => {
   try {
-    // Express-validator converts to int, but explicitly ensure numbers
+    // Express-validator sanitizes and converts values
+    // Use the sanitized values from req.query (middleware updates them in place)
     const page = req.query.page ? parseInt(req.query.page, 10) : undefined;
     const limit = req.query.limit ? parseInt(req.query.limit, 10) : undefined;
+    const status = req.query.status || 'all'; // Already sanitized to lowercase by middleware
 
-    // If no pagination params, return all tasks (backward compatibility)
+    // If no pagination params, return all filtered tasks (backward compatibility)
     if (!page && !limit) {
-      const tasks = Task.findAll();
+      const tasks = Task.findAll({ status });
       return res.status(200).json({
         success: true,
         count: tasks.length,
@@ -98,9 +100,13 @@ exports.getAllTasks = (req, res, next) => {
     const actualPage = page || 1;
     const actualLimit = limit || 10;
 
-    // Get paginated tasks
-    const tasks = Task.findAll({ page: actualPage, limit: actualLimit });
-    const total = Task.count();
+    // Get paginated and filtered tasks
+    const tasks = Task.findAll({
+      page: actualPage,
+      limit: actualLimit,
+      status
+    });
+    const total = Task.count({ status });
 
     // Calculate pagination metadata
     const totalPages = Math.ceil(total / actualLimit);

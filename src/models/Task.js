@@ -31,9 +31,18 @@ class Task {
   }
 
   static findAll(options = {}) {
+    // Apply status filter first (before sorting and pagination)
+    let filteredTasks = tasks;
+    const status = options.status || 'all';
+
+    if (status !== 'all') {
+      const shouldBeCompleted = status === 'completed';
+      filteredTasks = tasks.filter(task => task.completed === shouldBeCompleted);
+    }
+
     // Sort tasks for deterministic order (newest first by createdAt, then by ID descending)
     // Use ID as tiebreaker for tasks created in the same millisecond
-    const sorted = [...tasks].sort((a, b) => {
+    const sorted = [...filteredTasks].sort((a, b) => {
       const timeCompare = new Date(b.createdAt) - new Date(a.createdAt);
       if (timeCompare !== 0) {
         return timeCompare;
@@ -42,7 +51,7 @@ class Task {
       return b.id - a.id;
     });
 
-    // If no pagination options provided, return all tasks (backward compatibility)
+    // If no pagination options provided, return all filtered tasks (backward compatibility)
     if (!options.page && !options.limit) {
       return sorted;
     }
@@ -56,8 +65,16 @@ class Task {
     return sorted.slice(startIndex, endIndex);
   }
 
-  static count() {
-    return tasks.length;
+  static count(options = {}) {
+    // Apply status filter for count
+    const status = options.status || 'all';
+
+    if (status === 'all') {
+      return tasks.length;
+    }
+
+    const shouldBeCompleted = status === 'completed';
+    return tasks.filter(task => task.completed === shouldBeCompleted).length;
   }
 
   static findById(id) {

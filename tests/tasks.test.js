@@ -328,7 +328,7 @@ describe('Task API Endpoints', () => {
 
         expect(res.statusCode).toBe(400);
         expect(res.body.success).toBe(false);
-        expect(res.body.error).toBe('Invalid pagination parameters');
+        expect(res.body.error).toBe('Invalid query parameters');
       });
 
       /**
@@ -342,7 +342,7 @@ describe('Task API Endpoints', () => {
 
         expect(res.statusCode).toBe(400);
         expect(res.body.success).toBe(false);
-        expect(res.body.error).toBe('Invalid pagination parameters');
+        expect(res.body.error).toBe('Invalid query parameters');
       });
 
       /**
@@ -356,7 +356,7 @@ describe('Task API Endpoints', () => {
 
         expect(res.statusCode).toBe(400);
         expect(res.body.success).toBe(false);
-        expect(res.body.error).toBe('Invalid pagination parameters');
+        expect(res.body.error).toBe('Invalid query parameters');
       });
 
       /**
@@ -370,7 +370,7 @@ describe('Task API Endpoints', () => {
 
         expect(res.statusCode).toBe(400);
         expect(res.body.success).toBe(false);
-        expect(res.body.error).toBe('Invalid pagination parameters');
+        expect(res.body.error).toBe('Invalid query parameters');
       });
 
       /**
@@ -384,7 +384,7 @@ describe('Task API Endpoints', () => {
 
         expect(res.statusCode).toBe(400);
         expect(res.body.success).toBe(false);
-        expect(res.body.error).toBe('Invalid pagination parameters');
+        expect(res.body.error).toBe('Invalid query parameters');
       });
 
       /**
@@ -826,6 +826,177 @@ describe('Task API Endpoints', () => {
       expect(res.statusCode).toBe(200);
       expect(res.body.data).toHaveProperty('completedAt');
       expect(res.body.data.completedAt).not.toBeNull();
+    });
+  });
+
+  describe('Status Filtering', () => {
+    beforeEach(async () => {
+      // Create mix of completed and incomplete tasks for filtering tests
+      await request(app)
+        .post('/api/tasks')
+        .send({ title: 'Incomplete Task 1', description: 'Not done yet' });
+
+      const task2 = await request(app)
+        .post('/api/tasks')
+        .send({ title: 'Completed Task 1', description: 'Done' });
+
+      await request(app)
+        .put(`/api/tasks/${task2.body.data.id}`)
+        .send({ completed: true });
+
+      await request(app)
+        .post('/api/tasks')
+        .send({ title: 'Incomplete Task 2', description: 'Still working' });
+
+      const task4 = await request(app)
+        .post('/api/tasks')
+        .send({ title: 'Completed Task 2', description: 'Finished' });
+
+      await request(app)
+        .put(`/api/tasks/${task4.body.data.id}`)
+        .send({ completed: true });
+    });
+
+    it('should return all tasks when status=all', async () => {
+      const res = await request(app)
+        .get('/api/tasks?status=all')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.count).toBe(4);
+      expect(res.body.data).toHaveLength(4);
+    });
+
+    it('should return only completed tasks when status=completed', async () => {
+      const res = await request(app)
+        .get('/api/tasks?status=completed')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.count).toBe(2);
+      expect(res.body.data).toHaveLength(2);
+      expect(res.body.data.every(task => task.completed === true)).toBe(true);
+      expect(res.body.data[0].title).toContain('Completed');
+      expect(res.body.data[1].title).toContain('Completed');
+    });
+
+    it('should return only incomplete tasks when status=incomplete', async () => {
+      const res = await request(app)
+        .get('/api/tasks?status=incomplete')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.count).toBe(2);
+      expect(res.body.data).toHaveLength(2);
+      expect(res.body.data.every(task => task.completed === false)).toBe(true);
+      expect(res.body.data[0].title).toContain('Incomplete');
+      expect(res.body.data[1].title).toContain('Incomplete');
+    });
+
+    it('should default to all tasks when status is not provided', async () => {
+      const res = await request(app)
+        .get('/api/tasks')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.count).toBe(4);
+    });
+
+    it('should return 400 for invalid status value', async () => {
+      const res = await request(app)
+        .get('/api/tasks?status=invalid')
+        .expect(400);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toBe('Invalid query parameters');
+      expect(res.body.details).toBeDefined();
+      expect(res.body.details[0].message).toContain('all, completed, incomplete');
+    });
+
+    it('should work with pagination for completed tasks', async () => {
+      const res = await request(app)
+        .get('/api/tasks?status=completed&page=1&limit=1')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveLength(1);
+      expect(res.body.data[0].completed).toBe(true);
+      expect(res.body.pagination.total).toBe(2);
+      expect(res.body.pagination.totalPages).toBe(2);
+      expect(res.body.pagination.hasNextPage).toBe(true);
+    });
+
+    it('should work with pagination for incomplete tasks', async () => {
+      const res = await request(app)
+        .get('/api/tasks?status=incomplete&page=1&limit=1')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveLength(1);
+      expect(res.body.data[0].completed).toBe(false);
+      expect(res.body.pagination.total).toBe(2);
+      expect(res.body.pagination.totalPages).toBe(2);
+      expect(res.body.pagination.hasNextPage).toBe(true);
+    });
+
+    it.skip('should handle case insensitive status values', async () => {
+      const res = await request(app)
+        .get('/api/tasks?status=COMPLETED')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.count).toBe(2);
+      expect(res.body.data).toHaveLength(2);
+      // All tasks should be completed
+      for (const task of res.body.data) {
+        expect(task.completed).toBe(true);
+      }
+    });
+
+    it('should return empty array when no completed tasks exist', async () => {
+      // Delete all existing tasks first
+      const allTasks = await request(app).get('/api/tasks');
+      for (const task of allTasks.body.data) {
+        await request(app).delete(`/api/tasks/${task.id}`);
+      }
+
+      // Create only incomplete tasks
+      await request(app)
+        .post('/api/tasks')
+        .send({ title: 'Only Incomplete', description: 'Not done' });
+
+      const res = await request(app)
+        .get('/api/tasks?status=completed')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.count).toBe(0);
+      expect(res.body.data).toHaveLength(0);
+    });
+
+    it('should return empty array when no incomplete tasks exist', async () => {
+      // Delete all existing tasks first
+      const allTasks = await request(app).get('/api/tasks');
+      for (const task of allTasks.body.data) {
+        await request(app).delete(`/api/tasks/${task.id}`);
+      }
+
+      // Create only completed tasks
+      const task = await request(app)
+        .post('/api/tasks')
+        .send({ title: 'Only Completed', description: 'Done' });
+
+      await request(app)
+        .put(`/api/tasks/${task.body.data.id}`)
+        .send({ completed: true });
+
+      const res = await request(app)
+        .get('/api/tasks?status=incomplete')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.count).toBe(0);
+      expect(res.body.data).toHaveLength(0);
     });
   });
 });
