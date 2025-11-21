@@ -8,9 +8,15 @@
 # Usage (option 1 - Interactive):
 #   ./.claude/hooks/post-summary.sh
 #
-# Usage (option 2 - With arguments):
+# Usage (option 2 - With arguments, 2 params - backward compatible):
 #   ./.claude/hooks/post-summary.sh \
-#     "Your prompt: Add JSDoc comments" \
+#     "Your formatted request: Add JSDoc comments" \
+#     "Achievement: Added docs to 9 files, 460+ lines, all tests passing"
+#
+# Usage (option 3 - With actual prompt, 3 params - NEW):
+#   ./.claude/hooks/post-summary.sh \
+#     "add comments to codebase" \
+#     "Add comprehensive JSDoc comments throughout the codebase" \
 #     "Achievement: Added docs to 9 files, 460+ lines, all tests passing"
 #
 # Format:
@@ -30,7 +36,15 @@
 # Writing Good Summaries:
 #   See COMMENT-WRITING-GUIDE.md for detailed guidelines and examples
 #
+#   Comment Structure:
+#   - ACTUAL_PROMPT (optional): Raw user input, verbatim
+#     * Shows <= 3 lines: Displayed directly
+#     * Shows > 3 lines: Collapsed with "View full prompt" button
+#   - REQUEST: Formatted/contextualized description of task
+#   - RESPONSE/CHANGES MADE: What was achieved
+#
 #   Quick Tips:
+#   - ACTUAL_PROMPT: Verbatim user input (e.g., "add comments to codebase")
 #   - USER_PROMPT: Be specific, include context
 #   - ACHIEVEMENT: Use structured format with multiple paragraphs
 #     * Explain WHAT was done (specific changes)
@@ -72,15 +86,66 @@ if [ -z "$ISSUE_NUM" ] && [ -z "$PR_NUM" ]; then
 fi
 
 # Get user input
+# Supports 2 formats:
+#   2 params (backward compatible): post-summary.sh "request" "achievement"
+#   3 params (new format): post-summary.sh "actual_prompt" "request" "achievement"
 if [ -n "$1" ]; then
-  USER_PROMPT="$1"
-  ACHIEVEMENT="$2"
+  if [ -n "$3" ]; then
+    # 3 parameters: new format with actual prompt
+    ACTUAL_PROMPT="$1"
+    USER_PROMPT="$2"
+    ACHIEVEMENT="$3"
+  else
+    # 2 parameters: backward compatible (no actual prompt)
+    ACTUAL_PROMPT=""
+    USER_PROMPT="$1"
+    ACHIEVEMENT="$2"
+  fi
 else
-  echo "What did you ask Claude to do?"
+  # Interactive mode
+  echo "What was the actual prompt? (press Enter to skip)"
+  read -r ACTUAL_PROMPT
+  echo "What did you ask Claude to do? (formatted request)"
   read -r USER_PROMPT
   echo "What was achieved?"
   read -r ACHIEVEMENT
 fi
+
+# Function to format Actual Prompt section
+# Returns formatted section or empty string if no actual prompt
+format_actual_prompt() {
+  local actual_prompt="$1"
+
+  # If no actual prompt provided, return empty
+  [ -z "$actual_prompt" ] && return
+
+  # Count lines (newlines + 1)
+  local line_count=$(echo "$actual_prompt" | grep -c $'\n')
+  line_count=$((line_count + 1))
+
+  # If 3 or fewer lines, show directly
+  if [ $line_count -le 3 ]; then
+    echo "### Actual Prompt
+
+${actual_prompt}
+
+---
+"
+  else
+    # More than 3 lines, use collapsible details
+    echo "### Actual Prompt
+
+<details>
+<summary>View full prompt (${line_count} lines)</summary>
+
+${actual_prompt}
+
+</details>
+
+---
+"
+  fi
+}
 
 # Get commits and files
 BASE_BRANCH="main"
@@ -129,7 +194,13 @@ Time: ${TIMESTAMP}
 
 ---
 
-### Request
+"
+
+  # Add Actual Prompt section if provided
+  ACTUAL_PROMPT_SECTION=$(format_actual_prompt "$ACTUAL_PROMPT")
+  [ -n "$ACTUAL_PROMPT_SECTION" ] && ISSUE_COMMENT="${ISSUE_COMMENT}${ACTUAL_PROMPT_SECTION}"
+
+  ISSUE_COMMENT="${ISSUE_COMMENT}### Request
 
 ${USER_PROMPT}
 
@@ -229,7 +300,13 @@ Time: ${TIMESTAMP}
 
 ---
 
-### Request
+"
+
+  # Add Actual Prompt section if provided
+  ACTUAL_PROMPT_SECTION=$(format_actual_prompt "$ACTUAL_PROMPT")
+  [ -n "$ACTUAL_PROMPT_SECTION" ] && PR_COMMENT="${PR_COMMENT}${ACTUAL_PROMPT_SECTION}"
+
+  PR_COMMENT="${PR_COMMENT}### Request
 
 ${USER_PROMPT}
 
