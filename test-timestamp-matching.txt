@@ -21,8 +21,11 @@ NOT the other two prompts!
 Test Status:
 ------------
 - Commit 1: No prompts existed yet (showed default)
-- Commit 2: Testing with 3 prompts at 12:20, 12:25, 12:30
-  → Result: ✅ Matched to 12:30 prompt (third one) - CORRECT!
-- Commit 3: Added 4th prompt at 14:00 (future timestamp)
-  → Expected: Should STILL match to 12:30 prompt, NOT the 14:00 one
-  → This proves timestamp matching works (not just tail -1)
+- Commit 2-3: Wrong dates - all prompts were on Nov 22, commits on Nov 21
+  → Result: ❌ Fell back to tail -1 (showed wrong prompts)
+- Commit 4: Fixed dates to Nov 21 (17:20, 17:40, 17:50, 18:30)
+  → Expected: Should match to 17:50 prompt (third one)
+  → Commit time: ~17:54 UTC
+  → Should IGNORE 18:30 prompt (future)
+  → Manual test: ✅ jq query returns correct prompt!
+  → Now testing in real hook...
