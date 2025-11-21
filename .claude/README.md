@@ -45,10 +45,23 @@ Modified files A, B, C to support this change."
 ### 3. Automatic GitHub Updates
 
 **The post-commit hook runs automatically** and:
+- ✅ Captures the trigger prompt (@claude mention) autonomously
 - ✅ Extracts context from git (commits, diff, files)
 - ✅ Generates summary from your commit message
-- ✅ Posts to GitHub issue/PR automatically
+- ✅ Posts formatted update to GitHub issue/PR automatically
 - ✅ **Zero manual work required!**
+
+**Comment Format:**
+```markdown
+### 💬 Actual Prompt
+> [Your @claude mention that triggered the work]
+
+### ✅ What Was Delivered
+[Summary from commit messages and changes]
+
+### 📁 Files Changed
+[List of modified files]
+```
 
 **Note:** Comments post immediately after commits (before push). This is intentional - you commit when ready to share, then push shortly after. If you're experimenting with commits you don't intend to push, use `export DISABLE_AUTO_COMMENT=true` to prevent auto-posting.
 
@@ -64,20 +77,33 @@ gh pr merge          # Merges and auto-closes issue
 
 ## How It Works
 
-### Git-Based Context System
+### Autonomous Context System
 
-Instead of trying to capture your prompts, we use git as the source of truth:
+The system captures everything automatically from two sources:
+
+**1. GitHub API (for prompts):**
+- Extracts the @claude mention that triggered the work
+- Uses GitHub event data (in Actions) or API fallback
+- Shows what you originally asked for
+
+**2. Git History (for implementation):**
+- Extracts commits, diffs, and file changes
+- Shows what was actually delivered
+- All data persists across sessions
 
 ```
-User commits code
+User mentions @claude in comment
+      ↓
+Claude Code does the work and commits
       ↓
 Post-commit hook triggers (.git/hooks/post-commit)
       ↓
 Auto-summary script runs (.claude/scripts/auto-summary.sh)
+      ├─ Captures: @claude mention (trigger prompt)
       ├─ Extracts: git log (commits)
       ├─ Extracts: git diff (changes)
       ├─ Extracts: gh issue view (requirements)
-      └─ Generates: summary from commit messages
+      └─ Generates: formatted summary
       ↓
 Posts to GitHub (issue or PR)
       ↓
@@ -85,10 +111,11 @@ Done! No manual input needed
 ```
 
 **Why This Works:**
+- ✅ Captures actual prompts autonomously (no manual logging)
 - ✅ Git history persists across sessions
-- ✅ No stale data (git is always current)
+- ✅ No stale data (GitHub API + git are always current)
 - ✅ No fragile JSON files to maintain
-- ✅ Quality depends on commit messages (which you write anyway)
+- ✅ Clear "request vs delivery" format
 
 ---
 

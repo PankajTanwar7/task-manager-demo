@@ -3,13 +3,14 @@
 ###############################################################################
 # Automatic GitHub Comment Generator
 #
-# Generates high-quality GitHub comments from git context (no prompt capture!)
+# Generates high-quality GitHub comments with autonomous prompt capture
 #
-# Strategy (per @claude's recommendation):
+# Strategy:
+#   - Extract trigger prompts from GitHub comments (@claude mentions)
 #   - Extract work from git commits (what was done)
 #   - Extract changes from git diff (how it was done)
 #   - Extract requirements from GitHub issue (why it was done)
-#   - Generate summary from this context (no LLM needed for MVP)
+#   - Generate formatted summary with all context
 #
 # Usage:
 #   ./.claude/scripts/auto-summary.sh
@@ -17,10 +18,12 @@
 # Called by: .git/hooks/post-commit (automatically after each commit)
 #
 # Benefits:
+#   ✅ Autonomous prompt capture (GitHub event + API fallback)
 #   ✅ Works across session resumptions (git persists)
 #   ✅ No stale data (git is always current)
 #   ✅ No fragile JSON files to maintain
 #   ✅ Zero manual input required
+#   ✅ Clear format showing "what was asked" vs "what was delivered"
 ###############################################################################
 
 set -euo pipefail
@@ -108,6 +111,55 @@ extract_github_context() {
 }
 
 ###############################################################################
+# Prompt Capture (Autonomous)
+###############################################################################
+
+extract_trigger_prompt() {
+    local target_num="$1"
+    local target_type="$2"
+
+    print_info "Capturing trigger prompt..."
+
+    TRIGGER_PROMPT=""
+
+    # Method 1: GitHub event data (if in Actions)
+    if [ -n "${GITHUB_EVENT_PATH:-}" ] && [ -f "$GITHUB_EVENT_PATH" ]; then
+        local event_body
+        event_body=$(jq -r '.comment.body // .issue.body // .pull_request.body // ""' "$GITHUB_EVENT_PATH" 2>/dev/null)
+        if [ -n "$event_body" ]; then
+            # Extract just the part after @claude
+            TRIGGER_PROMPT=$(echo "$event_body" | sed -n 's/.*@claude[[:space:]]*//p' | head -1)
+            if [ -n "$TRIGGER_PROMPT" ]; then
+                print_success "Captured prompt from GitHub event"
+                return 0
+            fi
+        fi
+    fi
+
+    # Method 2: GitHub API (fallback)
+    if [ "$target_type" = "pr" ]; then
+        local pr_comments
+        pr_comments=$(gh pr view "$target_num" --json comments --jq '.comments | reverse | .[] | select(.body | contains("@claude")) | .body' 2>/dev/null | head -1)
+        if [ -n "$pr_comments" ]; then
+            TRIGGER_PROMPT=$(echo "$pr_comments" | sed -n 's/.*@claude[[:space:]]*//p' | head -1)
+        fi
+    else
+        local issue_comments
+        issue_comments=$(gh issue view "$target_num" --json comments --jq '.comments | reverse | .[] | select(.body | contains("@claude")) | .body' 2>/dev/null | head -1)
+        if [ -n "$issue_comments" ]; then
+            TRIGGER_PROMPT=$(echo "$issue_comments" | sed -n 's/.*@claude[[:space:]]*//p' | head -1)
+        fi
+    fi
+
+    if [ -n "$TRIGGER_PROMPT" ]; then
+        print_success "Captured prompt from GitHub API"
+    else
+        TRIGGER_PROMPT="[Automated commit - no trigger prompt]"
+        print_warning "No trigger prompt found (using default)"
+    fi
+}
+
+###############################################################################
 # Summary Generation (Template-based for MVP)
 ###############################################################################
 
@@ -154,13 +206,19 @@ Time: ${timestamp}
 
 ---
 
-### Changes Made
+### 💬 Actual Prompt
+
+> ${TRIGGER_PROMPT}
+
+---
+
+### ✅ What Was Delivered
 
 ${SUMMARY}
 
 ---
 
-### Files Changed in this Response
+### 📁 Files Changed
 
 <details>
 <summary>${LATEST_FILE_COUNT} files</summary>
@@ -176,14 +234,6 @@ ${SUMMARY}
 
         COMMENT="${COMMENT}
 </details>
-
----
-
-### All Commits in this Branch
-
-\`\`\`
-${ALL_COMMITS}
-\`\`\`
 
 ---
 
@@ -200,13 +250,19 @@ Time: ${timestamp}
 
 ---
 
-### Changes Made
+### 💬 Actual Prompt
+
+> ${TRIGGER_PROMPT}
+
+---
+
+### ✅ What Was Delivered
 
 ${SUMMARY}
 
 ---
 
-### Files Changed in this Update
+### 📁 Files Changed
 
 <details>
 <summary>${LATEST_FILE_COUNT} files</summary>
@@ -222,14 +278,6 @@ ${SUMMARY}
 
         COMMENT="${COMMENT}
 </details>
-
----
-
-### All Commits in this Branch
-
-\`\`\`
-${ALL_COMMITS}
-\`\`\`
 
 ---
 
@@ -310,10 +358,12 @@ main() {
         TARGET_NUM="$PR_NUM"
         TARGET_TYPE="pr"
         extract_github_context "$PR_NUM" "pr"
+        extract_trigger_prompt "$PR_NUM" "pr"
     elif [ -n "$ISSUE_NUM" ]; then
         TARGET_NUM="$ISSUE_NUM"
         TARGET_TYPE="issue"
         extract_github_context "$ISSUE_NUM" "issue"
+        extract_trigger_prompt "$ISSUE_NUM" "issue"
     else
         print_error "No target found"
         exit 1
