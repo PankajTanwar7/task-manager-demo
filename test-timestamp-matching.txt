@@ -1,0 +1,19 @@
+Timestamp-Based Prompt Matching Test
+=====================================
+
+This file exists to test that commits are matched to the correct prompt
+based on timestamp proximity.
+
+Test Scenario:
+--------------
+- prompt-history.json contains 3 prompts at different times
+- This commit should match to the THIRD prompt (most recent one before commit)
+- Previous algorithm would always show the last prompt
+- New algorithm finds the closest prompt before commit time
+
+Expected Result:
+----------------
+The auto-generated comment should show:
+"Third prompt: Create a simple test file to validate the system"
+
+NOT the other two prompts!
