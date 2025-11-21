@@ -185,18 +185,20 @@ exports.validateTaskId = [
 ];
 
 /**
- * Validation rules for pagination query parameters
+ * Validation rules for pagination and filtering query parameters
  *
  * Validates query parameters for GET /api/tasks:
  * - page: Optional, positive integer (>= 1), converted to integer
  * - limit: Optional, positive integer (1-100), converted to integer, max 100 items per page
+ * - status: Optional, one of: 'all', 'completed', 'incomplete' (default: 'all')
  *
- * Both parameters are optional. If not provided, controller will use defaults.
+ * All parameters are optional. If not provided, controller will use defaults.
  * Returns 400 with validation errors if any rule fails.
  *
  * Security considerations:
  * - Enforces maximum limit of 100 to prevent resource exhaustion
  * - Validates positive integers to prevent injection attacks
+ * - Whitelist approach for status values prevents injection
  *
  * @type {Array} Express middleware chain
  */
@@ -211,9 +213,20 @@ exports.validatePagination = [
     .isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100')
     .toInt(),
 
+  query('status')
+    .optional()
+    .trim()
+    .customSanitizer(value => {
+      // Explicitly convert to lowercase or default to 'all'
+      const sanitized = value ? value.toLowerCase() : 'all';
+      return sanitized;
+    })
+    .isIn(['all', 'completed', 'incomplete']).withMessage('Status must be one of: all, completed, incomplete'),
+
   /**
-   * Middleware to check pagination validation results
+   * Middleware to check pagination and filter validation results
    * Returns 400 if query parameters are invalid
+   * Sanitized values should be accessed via matchedData() in the controller
    */
   (req, res, next) => {
     const errors = validationResult(req);
@@ -221,7 +234,7 @@ exports.validatePagination = [
     if (!errors.isEmpty()) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid pagination parameters',
+        error: 'Invalid query parameters',
         details: errors.array().map(err => ({
           field: err.path,
           message: err.msg
