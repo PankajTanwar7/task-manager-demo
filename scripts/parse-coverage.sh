@@ -48,18 +48,16 @@ parse_coverage_section() {
     return 0  # Silent skip
   fi
 
-  # Level 3: Check if coverage file is recent (not stale)
-  # Only check if we have commits in current branch
-  BASE_BRANCH="main"
-  FIRST_COMMIT_TIME=$(git log ${BASE_BRANCH}..HEAD --reverse --format=%ct 2>/dev/null | head -1)
+  # Level 3: Check if coverage file is recent (not too old)
+  # Allow coverage from current session (within last 24 hours)
+  # On Linux: stat -c %Y, on macOS: stat -f %m
+  COVERAGE_FILE_TIME=$(stat -c %Y "$COVERAGE_FILE" 2>/dev/null || stat -f %m "$COVERAGE_FILE" 2>/dev/null || echo 0)
+  CURRENT_TIME=$(date +%s)
+  AGE_SECONDS=$((CURRENT_TIME - COVERAGE_FILE_TIME))
+  MAX_AGE_SECONDS=86400  # 24 hours
 
-  if [ -n "$FIRST_COMMIT_TIME" ]; then
-    # On Linux: stat -c %Y, on macOS: stat -f %m
-    COVERAGE_FILE_TIME=$(stat -c %Y "$COVERAGE_FILE" 2>/dev/null || stat -f %m "$COVERAGE_FILE" 2>/dev/null || echo 0)
-
-    if [ "$COVERAGE_FILE_TIME" -lt "$FIRST_COMMIT_TIME" ]; then
-      return 0  # Coverage is stale, skip section
-    fi
+  if [ "$AGE_SECONDS" -gt "$MAX_AGE_SECONDS" ]; then
+    return 0  # Coverage is too old (>24h), skip section
   fi
 
   # Extract overall coverage data
@@ -115,7 +113,7 @@ parse_coverage_section() {
     | map(select(.key != "total" and .value.lines.pct < $threshold))
     | sort_by(.value.lines.pct)
     | limit(10; .[])
-    | "- `" + (.key | sub("^\\./"; "")) + "` - " + (.value.lines.pct | tostring) + "%"
+    | "- `" + (.key | sub("^\\./"; "") | sub(".*/task-manager-demo/"; "")) + "` - " + (.value.lines.pct | tostring) + "%"
   ' "$COVERAGE_FILE" 2>/dev/null)
 
   local low_coverage_count=$(echo "$low_coverage_files" | grep -c '^-' || echo 0)
@@ -127,7 +125,7 @@ parse_coverage_section() {
     | sort_by(.value.lines.pct)
     | reverse
     | limit(10; .[])
-    | "- `" + (.key | sub("^\\./"; "")) + "` - " + (.value.lines.pct | tostring) + "%"
+    | "- `" + (.key | sub("^\\./"; "") | sub(".*/task-manager-demo/"; "")) + "` - " + (.value.lines.pct | tostring) + "%"
   ' "$COVERAGE_FILE" 2>/dev/null)
 
   local high_coverage_count=$(echo "$high_coverage_files" | grep -c '^-' || echo 0)
