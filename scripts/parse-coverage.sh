@@ -38,6 +38,9 @@ parse_coverage_section() {
   local coverage_key="$2"
   local current_num="$3"
 
+  # Get project root for path stripping (repository-agnostic)
+  local project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
   # Level 1: Check if coverage file exists
   if [ ! -f "$COVERAGE_FILE" ]; then
     return 0  # Silent skip
@@ -108,24 +111,24 @@ parse_coverage_section() {
      "$session_file" > "$session_file.tmp" && mv "$session_file.tmp" "$session_file"
 
   # Get files below threshold (limit to 10)
-  local low_coverage_files=$(jq -r --argjson threshold "$COVERAGE_THRESHOLD" '
+  local low_coverage_files=$(jq -r --argjson threshold "$COVERAGE_THRESHOLD" --arg root "$project_root/" '
     to_entries
     | map(select(.key != "total" and .value.lines.pct < $threshold))
     | sort_by(.value.lines.pct)
     | limit(10; .[])
-    | "- `" + (.key | sub("^\\./"; "") | sub(".*/task-manager-demo/"; "")) + "` - " + (.value.lines.pct | tostring) + "%"
+    | "- `" + (.key | sub("^\\./"; "") | sub("^\($root)"; "")) + "` - " + (.value.lines.pct | tostring) + "%"
   ' "$COVERAGE_FILE" 2>/dev/null)
 
   local low_coverage_count=$(echo "$low_coverage_files" | grep -c '^-' || echo 0)
 
   # Get well-covered files (limit to 10)
-  local high_coverage_files=$(jq -r --argjson threshold "$COVERAGE_THRESHOLD" '
+  local high_coverage_files=$(jq -r --argjson threshold "$COVERAGE_THRESHOLD" --arg root "$project_root/" '
     to_entries
     | map(select(.key != "total" and .value.lines.pct >= $threshold))
     | sort_by(.value.lines.pct)
     | reverse
     | limit(10; .[])
-    | "- `" + (.key | sub("^\\./"; "") | sub(".*/task-manager-demo/"; "")) + "` - " + (.value.lines.pct | tostring) + "%"
+    | "- `" + (.key | sub("^\\./"; "") | sub("^\($root)"; "")) + "` - " + (.value.lines.pct | tostring) + "%"
   ' "$COVERAGE_FILE" 2>/dev/null)
 
   local high_coverage_count=$(echo "$high_coverage_files" | grep -c '^-' || echo 0)
