@@ -144,3 +144,4 @@ vite.config.ts.timestamp-*
 .claude-prompt-*.md
 docs/dev-logs/
 *.backup
+.claude/session-counter.lock
