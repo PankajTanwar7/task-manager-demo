@@ -20,6 +20,13 @@
 
 # Configuration
 COVERAGE_THRESHOLD=${COVERAGE_THRESHOLD:-80}
+
+# Validate COVERAGE_THRESHOLD is a number between 0-100
+if ! [[ "$COVERAGE_THRESHOLD" =~ ^[0-9]+$ ]] || [ "$COVERAGE_THRESHOLD" -lt 0 ] || [ "$COVERAGE_THRESHOLD" -gt 100 ]; then
+  echo "Warning: Invalid COVERAGE_THRESHOLD ($COVERAGE_THRESHOLD), using default 80" >&2
+  COVERAGE_THRESHOLD=80
+fi
+
 COVERAGE_FILE="coverage/coverage-summary.json"
 
 ###############################################################################
