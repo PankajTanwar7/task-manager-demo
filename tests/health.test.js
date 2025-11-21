@@ -1,25 +1,10 @@
-/**
- * Health Endpoint Tests
- *
- * Tests the /health endpoint which provides application health status,
- * uptime, and environment information for monitoring purposes.
- *
- * Test Coverage:
- * - HTTP status code validation
- * - Required field presence and types
- * - Response format validation
- * - ISO timestamp format validation
- */
 
 const request = require('supertest');
 const app = require('../src/app');
 
 describe('Health Endpoint', () => {
   describe('GET /health', () => {
-    /**
-     * Verify that health endpoint returns 200 OK status
-     * and responds with JSON content type
-     */
+
     it('should return 200 OK', async () => {
       const res = await request(app)
         .get('/health')
@@ -29,10 +14,7 @@ describe('Health Endpoint', () => {
       expect(res.body.success).toBe(true);
     });
 
-    /**
-     * Verify that response contains required status and message fields
-     * with expected values
-     */
+
     it('should return status and message fields', async () => {
       const res = await request(app)
         .get('/health')
@@ -71,6 +53,7 @@ describe('Health Endpoint', () => {
       expect(res.body).toHaveProperty('timestamp');
 
       // Validate ISO 8601 format by parsing and round-tripping
+      // Validate ISO 8601 format
       const timestamp = new Date(res.body.timestamp);
       expect(timestamp).toBeInstanceOf(Date);
       expect(timestamp.toISOString()).toBe(res.body.timestamp);

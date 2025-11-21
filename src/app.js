@@ -88,11 +88,7 @@ app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 app.use('/api/tasks', taskRoutes);
 app.use('/health', healthRoutes);
 
-/**
- * 404 Not Found handler
- * Catches all unmatched routes and returns consistent error format
- * Must be defined after all valid routes
- */
+
 app.use((req, res) => {
   res.status(404).json({
     success: false,
