@@ -258,38 +258,31 @@ post_to_github() {
 
     [ ! -f "$SESSION_FILE" ] && echo '{}' > "$SESSION_FILE"
 
+    # Set KEY based on target type
+    if [ "$target_type" = "pr" ]; then
+        KEY="pr-${target_num}"
+    else
+        KEY="issue-${target_num}"
+    fi
+
     # Acquire lock (with flock if available, fallback to simple approach)
     if command -v flock &> /dev/null; then
         # Use flock for proper locking
         (
             flock -x 200  # Exclusive lock on fd 200
-
-            if [ "$target_type" = "pr" ]; then
-                KEY="pr-${target_num}"
-                COUNT=$(jq -r ".[\"$KEY\"] // 0" "$SESSION_FILE")
-                COUNT=$((COUNT + 1))
-                jq ".[\"$KEY\"] = $COUNT" "$SESSION_FILE" > "$SESSION_FILE.tmp" && mv "$SESSION_FILE.tmp" "$SESSION_FILE"
-            else
-                KEY="issue-${target_num}"
-                COUNT=$(jq -r ".[\"$KEY\"] // 0" "$SESSION_FILE")
-                COUNT=$((COUNT + 1))
-                jq ".[\"$KEY\"] = $COUNT" "$SESSION_FILE" > "$SESSION_FILE.tmp" && mv "$SESSION_FILE.tmp" "$SESSION_FILE"
-            fi
-
+            COUNT=$(jq -r ".[\"$KEY\"] // 0" "$SESSION_FILE")
+            COUNT=$((COUNT + 1))
+            jq ".[\"$KEY\"] = $COUNT" "$SESSION_FILE" > "$SESSION_FILE.tmp" && mv "$SESSION_FILE.tmp" "$SESSION_FILE"
+            echo "$COUNT"  # Output COUNT for parent shell
         ) 200>"$LOCK_FILE"
+        COUNT=$?  # Capture exit status (won't work, need different approach)
+        # Actually, re-read the count after lock is released
+        COUNT=$(jq -r ".[\"$KEY\"] // 0" "$SESSION_FILE")
     else
         # Fallback without flock (less safe but works)
-        if [ "$target_type" = "pr" ]; then
-            KEY="pr-${target_num}"
-            COUNT=$(jq -r ".[\"$KEY\"] // 0" "$SESSION_FILE")
-            COUNT=$((COUNT + 1))
-            jq ".[\"$KEY\"] = $COUNT" "$SESSION_FILE" > "$SESSION_FILE.tmp" && mv "$SESSION_FILE.tmp" "$SESSION_FILE"
-        else
-            KEY="issue-${target_num}"
-            COUNT=$(jq -r ".[\"$KEY\"] // 0" "$SESSION_FILE")
-            COUNT=$((COUNT + 1))
-            jq ".[\"$KEY\"] = $COUNT" "$SESSION_FILE" > "$SESSION_FILE.tmp" && mv "$SESSION_FILE.tmp" "$SESSION_FILE"
-        fi
+        COUNT=$(jq -r ".[\"$KEY\"] // 0" "$SESSION_FILE")
+        COUNT=$((COUNT + 1))
+        jq ".[\"$KEY\"] = $COUNT" "$SESSION_FILE" > "$SESSION_FILE.tmp" && mv "$SESSION_FILE.tmp" "$SESSION_FILE"
     fi
 
     # Post to GitHub
