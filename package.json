@@ -35,6 +35,7 @@
   },
   "homepage": "https://github.com/PankajTanwar7/task-manager-demo#readme",
   "dependencies": {
+    "compression": "^1.8.1",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",

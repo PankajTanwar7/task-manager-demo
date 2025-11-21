@@ -20,6 +20,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const compression = require('compression');
 const taskRoutes = require('./routes/tasks');
 const healthRoutes = require('./routes/health');
 const helloRoutes = require('./routes/hello');
@@ -27,6 +28,19 @@ const errorHandler = require('./middleware/errorHandler');
 const requestLogger = require('./middleware/requestLogger');
 
 const app = express();
+
+/**
+ * Apply response compression
+ * Compresses response bodies for all requests
+ * - Reduces bandwidth usage by 60-90%
+ * - Faster response times
+ * - Only compresses responses >= 1KB (threshold)
+ * - Supports gzip and deflate
+ */
+app.use(compression({
+  threshold: 1024, // Only compress responses > 1KB
+  level: 6 // Compression level (0-9, 6 is balanced)
+}));
 
 /**
  * Apply Helmet security middleware
