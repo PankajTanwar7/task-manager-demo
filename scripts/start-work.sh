@@ -21,7 +21,8 @@
 #   - jq for JSON parsing
 # ==============================================================================
 
-set -e
+set -euo pipefail  # Fail on errors, undefined vars, pipe failures
+IFS=$'\n\t'        # Prevent word splitting issues
 
 # Colors for output
 RED='\033[0;31m'
@@ -276,6 +277,13 @@ main() {
     fi
 
     issue_num=$1
+
+    # Security: Validate issue number is numeric (prevent path traversal)
+    if ! [[ "$issue_num" =~ ^[0-9]+$ ]]; then
+        print_error "Invalid issue number: '$issue_num'"
+        echo "Issue number must be a positive integer"
+        exit 1
+    fi
 
     # Run workflow
     check_requirements

@@ -18,6 +18,9 @@
 #   COVERAGE_THRESHOLD - Minimum coverage percentage (default: 80)
 ###############################################################################
 
+set -euo pipefail  # Fail on errors, undefined vars, pipe failures
+IFS=$'\n\t'        # Prevent word splitting issues
+
 # Configuration
 COVERAGE_THRESHOLD=${COVERAGE_THRESHOLD:-80}
 
