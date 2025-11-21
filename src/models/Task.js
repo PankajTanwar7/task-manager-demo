@@ -29,8 +29,34 @@ class Task {
     return task;
   }
 
-  static findAll() {
-    return tasks;
+  static findAll(options = {}) {
+    // Sort tasks for deterministic order (newest first by createdAt, then by ID descending)
+    // Use ID as tiebreaker for tasks created in the same millisecond
+    const sorted = [...tasks].sort((a, b) => {
+      const timeCompare = new Date(b.createdAt) - new Date(a.createdAt);
+      if (timeCompare !== 0) {
+        return timeCompare;
+      }
+      // If timestamps are equal, sort by ID descending (newer IDs first)
+      return b.id - a.id;
+    });
+
+    // If no pagination options provided, return all tasks (backward compatibility)
+    if (!options.page && !options.limit) {
+      return sorted;
+    }
+
+    // Apply pagination using slice
+    const page = options.page || 1;
+    const limit = options.limit || 10;
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+
+    return sorted.slice(startIndex, endIndex);
+  }
+
+  static count() {
+    return tasks.length;
   }
 
   static findById(id) {

@@ -10,15 +10,16 @@
  * - Type validation: Ensures correct data types
  * - Detailed error messages: Returns field-specific validation errors
  *
- * Exports three validation middleware chains:
+ * Exports four validation middleware chains:
  * - validateCreateTask: For POST /api/tasks
  * - validateUpdateTask: For PUT /api/tasks/:id
  * - validateTaskId: For any route with :id parameter
+ * - validatePagination: For GET /api/tasks (query parameters)
  *
  * @module middleware/validation
  */
 
-const { body, param, validationResult } = require('express-validator');
+const { body, param, query, validationResult } = require('express-validator');
 const xss = require('xss');
 
 /**
@@ -156,6 +157,55 @@ exports.validateTaskId = [
       return res.status(400).json({
         success: false,
         error: 'Invalid task ID',
+        details: errors.array().map(err => ({
+          field: err.path,
+          message: err.msg
+        }))
+      });
+    }
+
+    next();
+  }
+];
+
+/**
+ * Validation rules for pagination query parameters
+ *
+ * Validates query parameters for GET /api/tasks:
+ * - page: Optional, positive integer (>= 1), converted to integer
+ * - limit: Optional, positive integer (1-100), converted to integer, max 100 items per page
+ *
+ * Both parameters are optional. If not provided, controller will use defaults.
+ * Returns 400 with validation errors if any rule fails.
+ *
+ * Security considerations:
+ * - Enforces maximum limit of 100 to prevent resource exhaustion
+ * - Validates positive integers to prevent injection attacks
+ *
+ * @type {Array} Express middleware chain
+ */
+exports.validatePagination = [
+  query('page')
+    .optional()
+    .isInt({ min: 1 }).withMessage('Page must be a positive integer (>= 1)')
+    .toInt(),
+
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100')
+    .toInt(),
+
+  /**
+   * Middleware to check pagination validation results
+   * Returns 400 if query parameters are invalid
+   */
+  (req, res, next) => {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid pagination parameters',
         details: errors.array().map(err => ({
           field: err.path,
           message: err.msg

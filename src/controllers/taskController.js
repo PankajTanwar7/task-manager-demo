@@ -43,21 +43,81 @@ exports.createTask = (req, res, next) => {
 };
 
 /**
- * Get all tasks
+ * Get all tasks with optional pagination
+ *
+ * Supports query parameters:
+ * - page: Page number (positive integer, default: return all)
+ * - limit: Items per page (1-100, default: return all)
+ *
+ * Response format with pagination:
+ * {
+ *   success: true,
+ *   data: [...],
+ *   pagination: {
+ *     total: 50,
+ *     page: 2,
+ *     limit: 10,
+ *     totalPages: 5,
+ *     hasNextPage: true,
+ *     hasPrevPage: true
+ *   }
+ * }
+ *
+ * Response format without pagination:
+ * {
+ *   success: true,
+ *   count: 50,
+ *   data: [...]
+ * }
  *
  * @param {Object} req - Express request object
+ * @param {Object} req.query - Query parameters
+ * @param {number} [req.query.page] - Page number (validated by middleware)
+ * @param {number} [req.query.limit] - Items per page (validated by middleware)
  * @param {Object} res - Express response object
  * @param {Function} next - Express next middleware function
- * @returns {void} Sends 200 JSON response with array of all tasks
+ * @returns {void} Sends 200 JSON response with tasks and pagination metadata
  */
 exports.getAllTasks = (req, res, next) => {
   try {
-    const tasks = Task.findAll();
+    // Express-validator converts to int, but explicitly ensure numbers
+    const page = req.query.page ? parseInt(req.query.page, 10) : undefined;
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : undefined;
+
+    // If no pagination params, return all tasks (backward compatibility)
+    if (!page && !limit) {
+      const tasks = Task.findAll();
+      return res.status(200).json({
+        success: true,
+        count: tasks.length,
+        data: tasks
+      });
+    }
+
+    // Set defaults if only one param provided
+    const actualPage = page || 1;
+    const actualLimit = limit || 10;
+
+    // Get paginated tasks
+    const tasks = Task.findAll({ page: actualPage, limit: actualLimit });
+    const total = Task.count();
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(total / actualLimit);
+    const hasNextPage = actualPage < totalPages;
+    const hasPrevPage = actualPage > 1;
 
     res.status(200).json({
       success: true,
-      count: tasks.length,
-      data: tasks
+      data: tasks,
+      pagination: {
+        total,
+        page: actualPage,
+        limit: actualLimit,
+        totalPages,
+        hasNextPage,
+        hasPrevPage
+      }
     });
   } catch (error) {
     next(error);
