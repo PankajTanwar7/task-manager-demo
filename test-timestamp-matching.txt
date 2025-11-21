@@ -14,6 +14,12 @@ Test Scenario:
 Expected Result:
 ----------------
 The auto-generated comment should show:
-"Third prompt: Create a simple test file to validate the system"
+"Third test prompt: Create a simple test file to validate timestamp-based prompt matching works correctly"
 
 NOT the other two prompts!
+
+Test Status:
+------------
+- Commit 1: No prompts existed yet (showed default)
+- Commit 2: Testing with 3 prompts at 12:20, 12:25, 12:30
+  → Should match to the 12:30 prompt (third one)
