@@ -22,4 +22,7 @@ Test Status:
 ------------
 - Commit 1: No prompts existed yet (showed default)
 - Commit 2: Testing with 3 prompts at 12:20, 12:25, 12:30
-  → Should match to the 12:30 prompt (third one)
+  → Result: ✅ Matched to 12:30 prompt (third one) - CORRECT!
+- Commit 3: Added 4th prompt at 14:00 (future timestamp)
+  → Expected: Should STILL match to 12:30 prompt, NOT the 14:00 one
+  → This proves timestamp matching works (not just tail -1)
