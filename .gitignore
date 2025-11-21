@@ -141,6 +141,8 @@ vite.config.ts.timestamp-*
 # Claude Code local files (session tracking, prompts, dev logs)
 .claude/session-counter.json
 .claude/prompt-history.json
+.claude/post-summary-debug.log
+.claude/failed-comment-*.txt
 .claude-prompt-*.md
 docs/dev-logs/
 *.backup

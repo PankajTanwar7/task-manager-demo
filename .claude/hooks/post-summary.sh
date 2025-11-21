@@ -126,101 +126,58 @@ if [ -z "$ISSUE_NUM" ] && [ -z "$PR_NUM" ]; then
   exit 1
 fi
 
+# Auto-generate REQUEST and ACHIEVEMENT from git commit
+# Takes commit SHA as parameter, returns formatted strings
+auto_generate_descriptions() {
+  local commit_sha="$1"
+
+  # Extract commit message parts
+  local commit_subject=$(git log -1 --format=%s "$commit_sha" 2>/dev/null || echo "")
+  local commit_body=$(git log -1 --format=%b "$commit_sha" 2>/dev/null || echo "")
+
+  # Generate REQUEST from commit subject (remove issue number)
+  AUTO_REQUEST=$(echo "$commit_subject" | sed 's/ (#[0-9]\+)$//')
+
+  # Generate ACHIEVEMENT from commit body + diff stats
+  local files_changed=$(git diff --name-only "${commit_sha}~1..$commit_sha" 2>/dev/null | wc -l | tr -d ' ')
+  local diff_stat=$(git diff --stat "${commit_sha}~1..$commit_sha" 2>/dev/null | tail -1)
+
+  if [ -n "$commit_body" ]; then
+    AUTO_ACHIEVEMENT="$commit_body
+
+**Changes:** Modified $files_changed files
+$diff_stat"
+  else
+    AUTO_ACHIEVEMENT="**Changes:** Modified $files_changed files
+$diff_stat"
+  fi
+
+  log_debug "Auto-generated REQUEST: $AUTO_REQUEST"
+  log_debug "Auto-generated ACHIEVEMENT: ${#AUTO_ACHIEVEMENT} chars"
+}
+
 # Get user input
-# Supports 3 formats:
-#   2 params (AUTO with priority chain): post-summary.sh "request" "achievement"
+# Supports 4 formats:
+#   0 params (FULL AUTO): post-summary.sh
+#      → Automatically generates everything from latest commit
+#      → Detects prompt from multiple sources
+#      → Perfect for post-commit hook (zero manual work)
+#   2 params (SEMI-AUTO): post-summary.sh "request" "achievement"
 #      → Automatically detects prompt from multiple sources
+#      → Manual REQUEST and ACHIEVEMENT
 #   3 params (MANUAL override): post-summary.sh "actual_prompt" "request" "achievement"
 #      → Uses provided actual_prompt (highest priority)
-#   0 params (INTERACTIVE): Prompts for all inputs
+#   "interactive" (INTERACTIVE): post-summary.sh interactive
+#      → Prompts for all inputs
 #
-# Prompt Source Priority (automatic in 2-param mode):
+# Prompt Source Priority (automatic in 0-param and 2-param modes):
 #   1. Explicit 3rd parameter (manual override)
-#   2. .claude/prompt-history.json (fresh session, hook captured)
+#   2. .claude/prompt-history.json with timestamp matching (fresh session, hook captured)
 #   3. .claude-prompt-issue-{NUM}.md (workflow file, survives resumption)
 #   4. Skip Actual Prompt section (no source found)
-if [ -n "$1" ]; then
-  if [ -n "$3" ]; then
-    # 3 parameters: manual override with explicit actual prompt (PRIORITY 1)
-    ACTUAL_PROMPT=$(sanitize_input "$1")
-    USER_PROMPT="$2"
-    ACHIEVEMENT="$3"
-    PROMPT_SOURCE="manual-override"
-  else
-    # 2 parameters: AUTO MODE with priority chain
-    USER_PROMPT="$1"
-    ACHIEVEMENT="$2"
-    ACTUAL_PROMPT=""
-    PROMPT_SOURCE="none"
 
-    log_debug "=== Prompt Detection Start ==="
-    log_debug "Branch: $BRANCH"
-    log_debug "Issue Number: $ISSUE_NUM"
-
-    # PRIORITY 2: Try to read last prompt from history file (fresh session)
-    HISTORY_FILE=".claude/prompt-history.json"
-    log_debug "Checking prompt history: $HISTORY_FILE"
-    if [ -f "$HISTORY_FILE" ]; then
-      log_debug "History file exists"
-      if command -v jq &> /dev/null; then
-        # Validate prompt is for current issue (critical: prevents using stale prompts from other issues)
-        HISTORY_ISSUE=$(jq -r '.prompts[-1].issueNumber // ""' "$HISTORY_FILE" 2>/dev/null || echo "")
-        HISTORY_PROMPT=$(jq -r '.prompts[-1].prompt // ""' "$HISTORY_FILE" 2>/dev/null || echo "")
-
-        if [ -n "$HISTORY_PROMPT" ] && [ "$HISTORY_ISSUE" = "$ISSUE_NUM" ]; then
-          ACTUAL_PROMPT=$(sanitize_input "$HISTORY_PROMPT")
-          PROMPT_SOURCE="prompt-history"
-          log_debug "SUCCESS: Loaded from prompt history (${#ACTUAL_PROMPT} chars, issue $HISTORY_ISSUE)"
-          echo "✓ Loaded prompt from history (fresh session capture)"
-        elif [ -n "$HISTORY_PROMPT" ] && [ "$HISTORY_ISSUE" != "$ISSUE_NUM" ]; then
-          log_debug "History prompt is for different issue ($HISTORY_ISSUE vs $ISSUE_NUM), skipping"
-          echo "⚠️  History has stale prompt from issue #${HISTORY_ISSUE}, skipping"
-        else
-          log_debug "History file empty or invalid"
-        fi
-      else
-        log_debug "jq not available (install with: apt-get install jq)"
-        echo "⚠️  jq not installed, cannot read prompt history (install with: apt-get install jq)"
-      fi
-    else
-      log_debug "History file not found"
-    fi
-
-    # PRIORITY 3: Check for workflow prompt file (survives resumption)
-    if [ -z "$ACTUAL_PROMPT" ] && [ -n "$ISSUE_NUM" ]; then
-      WORKFLOW_PROMPT_FILE=".claude-prompt-issue-${ISSUE_NUM}.md"
-      log_debug "Checking workflow file: $WORKFLOW_PROMPT_FILE"
-      if [ -f "$WORKFLOW_PROMPT_FILE" ]; then
-        # Security: Validate file size before reading (1MB limit)
-        # Using wc -c for portability across macOS and Linux
-        FILE_SIZE=$(wc -c < "$WORKFLOW_PROMPT_FILE" 2>/dev/null | tr -d ' ' || echo 0)
-        if [ "$FILE_SIZE" -gt 1048576 ]; then  # 1MB = 1048576 bytes
-          log_debug "Workflow file too large: ${FILE_SIZE} bytes (limit: 1MB)"
-          echo "⚠️  Workflow file too large (${FILE_SIZE} bytes), skipping"
-        else
-          ACTUAL_PROMPT=$(sanitize_input "$(cat "$WORKFLOW_PROMPT_FILE")")
-          PROMPT_SOURCE="workflow-file"
-          log_debug "SUCCESS: Loaded from workflow file (${#ACTUAL_PROMPT} chars)"
-          echo "✓ Loaded prompt from workflow file: $WORKFLOW_PROMPT_FILE"
-        fi
-      else
-        log_debug "Workflow file not found"
-      fi
-    elif [ -z "$ACTUAL_PROMPT" ]; then
-      log_debug "Skipping workflow file check (no issue number)"
-    fi
-
-    # PRIORITY 4: No source found (will skip Actual Prompt section)
-    if [ -z "$ACTUAL_PROMPT" ]; then
-      log_debug "RESULT: No prompt found (all sources exhausted)"
-      echo "ℹ️  No prompt found (tried history + workflow file)"
-      PROMPT_SOURCE="none"
-    fi
-
-    log_debug "=== Prompt Detection End (source: $PROMPT_SOURCE) ==="
-  fi
-else
-  # Interactive mode
+if [ "$1" = "interactive" ]; then
+  # Interactive mode - prompt for everything
   echo "What was the actual prompt? (press Enter to skip)"
   read -r ACTUAL_PROMPT_RAW
   ACTUAL_PROMPT=$(sanitize_input "$ACTUAL_PROMPT_RAW")
@@ -229,6 +186,188 @@ else
   echo "What was achieved?"
   read -r ACHIEVEMENT
   PROMPT_SOURCE="interactive"
+
+elif [ -n "$3" ]; then
+  # 3 parameters: manual override with explicit actual prompt (PRIORITY 1)
+  ACTUAL_PROMPT=$(sanitize_input "$1")
+  USER_PROMPT="$2"
+  ACHIEVEMENT="$3"
+  PROMPT_SOURCE="manual-override"
+
+elif [ -n "$1" ]; then
+  # 2 parameters: SEMI-AUTO MODE with priority chain
+  USER_PROMPT="$1"
+  ACHIEVEMENT="$2"
+  ACTUAL_PROMPT=""
+  PROMPT_SOURCE="none"
+
+  log_debug "=== Prompt Detection Start (SEMI-AUTO) ==="
+  log_debug "Branch: $BRANCH"
+  log_debug "Issue Number: $ISSUE_NUM"
+
+  # PRIORITY 2: Try to read prompt from history with timestamp matching
+  HISTORY_FILE=".claude/prompt-history.json"
+  log_debug "Checking prompt history: $HISTORY_FILE"
+  if [ -f "$HISTORY_FILE" ]; then
+    log_debug "History file exists"
+    if command -v jq &> /dev/null; then
+      # Get commit timestamp for matching
+      COMMIT_TIME=$(git log -1 --format=%ct 2>/dev/null || echo "0")
+      log_debug "Commit timestamp: $COMMIT_TIME"
+
+      # Find prompt within 10 minutes before commit, matching issue number
+      MATCHED_PROMPT=$(jq -r --arg ct "$COMMIT_TIME" --arg issue "$ISSUE_NUM" '
+        .prompts[] |
+        select(.issueNumber == $issue) |
+        select((.timestamp | tonumber) <= ($ct | tonumber)) |
+        select(($ct | tonumber) - (.timestamp | tonumber) < 600) |
+        .prompt
+      ' "$HISTORY_FILE" 2>/dev/null | tail -1)
+
+      if [ -n "$MATCHED_PROMPT" ]; then
+        ACTUAL_PROMPT=$(sanitize_input "$MATCHED_PROMPT")
+        PROMPT_SOURCE="prompt-history-matched"
+        log_debug "SUCCESS: Matched prompt by timestamp (${#ACTUAL_PROMPT} chars, within 10min)"
+        echo "✓ Loaded prompt from history (timestamp matched)"
+      else
+        log_debug "No matching prompt found by timestamp"
+        echo "ℹ️  No recent prompt in history (checked within 10min)"
+      fi
+    else
+      log_debug "jq not available (install with: apt-get install jq)"
+      echo "⚠️  jq not installed, cannot read prompt history (install with: apt-get install jq)"
+    fi
+  else
+    log_debug "History file not found"
+  fi
+
+  # PRIORITY 3: Check for workflow prompt file (survives resumption)
+  if [ -z "$ACTUAL_PROMPT" ] && [ -n "$ISSUE_NUM" ]; then
+    WORKFLOW_PROMPT_FILE=".claude-prompt-issue-${ISSUE_NUM}.md"
+    log_debug "Checking workflow file: $WORKFLOW_PROMPT_FILE"
+    if [ -f "$WORKFLOW_PROMPT_FILE" ]; then
+      # Security: Validate file size before reading (1MB limit)
+      FILE_SIZE=$(wc -c < "$WORKFLOW_PROMPT_FILE" 2>/dev/null | tr -d ' ' || echo 0)
+      if [ "$FILE_SIZE" -gt 1048576 ]; then  # 1MB = 1048576 bytes
+        log_debug "Workflow file too large: ${FILE_SIZE} bytes (limit: 1MB)"
+        echo "⚠️  Workflow file too large (${FILE_SIZE} bytes), skipping"
+      else
+        ACTUAL_PROMPT=$(sanitize_input "$(cat "$WORKFLOW_PROMPT_FILE")")
+        PROMPT_SOURCE="workflow-file"
+        log_debug "SUCCESS: Loaded from workflow file (${#ACTUAL_PROMPT} chars)"
+        echo "✓ Loaded prompt from workflow file: $WORKFLOW_PROMPT_FILE"
+      fi
+    else
+      log_debug "Workflow file not found"
+    fi
+  elif [ -z "$ACTUAL_PROMPT" ]; then
+    log_debug "Skipping workflow file check (no issue number)"
+  fi
+
+  # PRIORITY 4: No source found (will skip Actual Prompt section)
+  if [ -z "$ACTUAL_PROMPT" ]; then
+    log_debug "RESULT: No prompt found (all sources exhausted)"
+    echo "ℹ️  No prompt found (tried history + workflow file)"
+    PROMPT_SOURCE="none"
+  fi
+
+  log_debug "=== Prompt Detection End (source: $PROMPT_SOURCE) ==="
+
+else
+  # 0 parameters: FULL AUTO MODE - generate everything from git
+  log_debug "=== FULL AUTO MODE ==="
+
+  # Get latest commit
+  LATEST_COMMIT=$(git log -1 --format=%H 2>/dev/null || echo "")
+  if [ -z "$LATEST_COMMIT" ]; then
+    echo "❌ No commits found"
+    exit 1
+  fi
+
+  log_debug "Latest commit: $LATEST_COMMIT"
+
+  # Auto-generate REQUEST and ACHIEVEMENT
+  auto_generate_descriptions "$LATEST_COMMIT"
+  USER_PROMPT="$AUTO_REQUEST"
+  ACHIEVEMENT="$AUTO_ACHIEVEMENT"
+
+  echo "✓ Auto-generated from commit: ${LATEST_COMMIT:0:7}"
+
+  # Now detect prompt with timestamp matching
+  ACTUAL_PROMPT=""
+  PROMPT_SOURCE="none"
+
+  log_debug "=== Prompt Detection Start (FULL AUTO) ==="
+  log_debug "Branch: $BRANCH"
+  log_debug "Issue Number: $ISSUE_NUM"
+
+  # PRIORITY 2: Try to read prompt from history with timestamp matching
+  HISTORY_FILE=".claude/prompt-history.json"
+  log_debug "Checking prompt history: $HISTORY_FILE"
+  if [ -f "$HISTORY_FILE" ]; then
+    log_debug "History file exists"
+    if command -v jq &> /dev/null; then
+      # Get commit timestamp for matching
+      COMMIT_TIME=$(git log -1 --format=%ct 2>/dev/null || echo "0")
+      log_debug "Commit timestamp: $COMMIT_TIME"
+
+      # Find prompt within 10 minutes before commit, matching issue number
+      MATCHED_PROMPT=$(jq -r --arg ct "$COMMIT_TIME" --arg issue "$ISSUE_NUM" '
+        .prompts[] |
+        select(.issueNumber == $issue) |
+        select((.timestamp | tonumber) <= ($ct | tonumber)) |
+        select(($ct | tonumber) - (.timestamp | tonumber) < 600) |
+        .prompt
+      ' "$HISTORY_FILE" 2>/dev/null | tail -1)
+
+      if [ -n "$MATCHED_PROMPT" ]; then
+        ACTUAL_PROMPT=$(sanitize_input "$MATCHED_PROMPT")
+        PROMPT_SOURCE="prompt-history-matched"
+        log_debug "SUCCESS: Matched prompt by timestamp (${#ACTUAL_PROMPT} chars, within 10min)"
+        echo "✓ Loaded prompt from history (timestamp matched)"
+      else
+        log_debug "No matching prompt found by timestamp"
+        echo "ℹ️  No recent prompt in history (checked within 10min)"
+      fi
+    else
+      log_debug "jq not available (install with: apt-get install jq)"
+      echo "⚠️  jq not installed, cannot read prompt history"
+    fi
+  else
+    log_debug "History file not found"
+  fi
+
+  # PRIORITY 3: Check for workflow prompt file (survives resumption)
+  if [ -z "$ACTUAL_PROMPT" ] && [ -n "$ISSUE_NUM" ]; then
+    WORKFLOW_PROMPT_FILE=".claude-prompt-issue-${ISSUE_NUM}.md"
+    log_debug "Checking workflow file: $WORKFLOW_PROMPT_FILE"
+    if [ -f "$WORKFLOW_PROMPT_FILE" ]; then
+      # Security: Validate file size before reading (1MB limit)
+      FILE_SIZE=$(wc -c < "$WORKFLOW_PROMPT_FILE" 2>/dev/null | tr -d ' ' || echo 0)
+      if [ "$FILE_SIZE" -gt 1048576 ]; then  # 1MB = 1048576 bytes
+        log_debug "Workflow file too large: ${FILE_SIZE} bytes (limit: 1MB)"
+        echo "⚠️  Workflow file too large (${FILE_SIZE} bytes), skipping"
+      else
+        ACTUAL_PROMPT=$(sanitize_input "$(cat "$WORKFLOW_PROMPT_FILE")")
+        PROMPT_SOURCE="workflow-file"
+        log_debug "SUCCESS: Loaded from workflow file (${#ACTUAL_PROMPT} chars)"
+        echo "✓ Loaded prompt from workflow file: $WORKFLOW_PROMPT_FILE"
+      fi
+    else
+      log_debug "Workflow file not found"
+    fi
+  elif [ -z "$ACTUAL_PROMPT" ]; then
+    log_debug "Skipping workflow file check (no issue number)"
+  fi
+
+  # PRIORITY 4: No source found (will skip Actual Prompt section)
+  if [ -z "$ACTUAL_PROMPT" ]; then
+    log_debug "RESULT: No prompt found (all sources exhausted)"
+    echo "ℹ️  No prompt found (tried history + workflow file)"
+    PROMPT_SOURCE="none"
+  fi
+
+  log_debug "=== Prompt Detection End (source: $PROMPT_SOURCE) ==="
 fi
 
 # Function to format Actual Prompt section
@@ -522,14 +661,63 @@ ${COMMITS}
 "
 fi
 
+# Function to post comment with retry logic
+# Parameters: $1 = target type ("pr" or "issue"), $2 = target number, $3 = comment body
+post_with_retry() {
+  local target_type="$1"
+  local target_num="$2"
+  local comment_body="$3"
+  local max_retries=3
+  local retry_delay=2
+
+  for ((i=1; i<=max_retries; i++)); do
+    log_debug "Posting attempt $i/$max_retries to $target_type #$target_num"
+
+    if [ "$target_type" = "pr" ]; then
+      if echo "$comment_body" | gh pr comment "$target_num" --body-file - 2>&1; then
+        return 0  # Success
+      fi
+    else
+      if echo "$comment_body" | gh issue comment "$target_num" --body-file - 2>&1; then
+        return 0  # Success
+      fi
+    fi
+
+    # Failed, retry if not last attempt
+    if [ $i -lt $max_retries ]; then
+      echo "⚠️  Post failed (attempt $i/$max_retries), retrying in ${retry_delay}s..."
+      log_debug "Retry after ${retry_delay}s delay"
+      sleep $retry_delay
+      retry_delay=$((retry_delay * 2))  # Exponential backoff
+    fi
+  done
+
+  # All retries failed
+  echo "❌ Failed to post after $max_retries attempts"
+  log_debug "All retry attempts exhausted"
+  return 1
+}
+
 # Post comments - PR takes precedence over Issue
 # Once a PR is created, all updates go to PR only (not both)
 if [ -n "$PR_NUM" ]; then
-  echo "$PR_COMMENT" | gh pr comment "$PR_NUM" --body-file - && \
+  if post_with_retry "pr" "$PR_NUM" "$PR_COMMENT"; then
     echo "✓ Posted to PR #${PR_NUM} (Update #${PR_UPDATE_NUM})"
+  else
+    echo "❌ Could not post to PR #${PR_NUM}"
+    echo "   Comment saved to: .claude/failed-comment-pr-${PR_NUM}.txt"
+    echo "$PR_COMMENT" > ".claude/failed-comment-pr-${PR_NUM}.txt"
+    exit 1
+  fi
 elif [ -n "$ISSUE_NUM" ]; then
-  echo "$ISSUE_COMMENT" | gh issue comment "$ISSUE_NUM" --body-file - && \
+  if post_with_retry "issue" "$ISSUE_NUM" "$ISSUE_COMMENT"; then
     echo "✓ Posted to Issue #${ISSUE_NUM} (Response #${ISSUE_RESPONSE_NUM})"
+  else
+    echo "❌ Could not post to Issue #${ISSUE_NUM}"
+    echo "   Comment saved to: .claude/failed-comment-issue-${ISSUE_NUM}.txt"
+    echo "$ISSUE_COMMENT" > ".claude/failed-comment-issue-${ISSUE_NUM}.txt"
+    exit 1
+  fi
 else
   echo "❌ No issue or PR found to post to"
   exit 1
