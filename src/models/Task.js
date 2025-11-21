@@ -40,18 +40,48 @@ class Task {
       filteredTasks = tasks.filter(task => task.completed === shouldBeCompleted);
     }
 
-    // Sort tasks for deterministic order (newest first by createdAt, then by ID descending)
-    // Use ID as tiebreaker for tasks created in the same millisecond
+    // Extract sort options (default: createdAt desc)
+    const sortBy = options.sortBy || 'createdat';
+    const sortOrder = options.sortOrder || 'desc';
+
+    // Sort tasks based on specified field and order
     const sorted = [...filteredTasks].sort((a, b) => {
-      const timeCompare = new Date(b.createdAt) - new Date(a.createdAt);
-      if (timeCompare !== 0) {
-        return timeCompare;
+      let comparison = 0;
+
+      // Perform comparison based on sortBy field
+      switch (sortBy) {
+        case 'createdat':
+          comparison = new Date(a.createdAt) - new Date(b.createdAt);
+          break;
+        case 'updatedat':
+          comparison = new Date(a.updatedAt) - new Date(b.updatedAt);
+          break;
+        case 'title':
+          comparison = a.title.localeCompare(b.title);
+          break;
+        case 'completed':
+          // Sort by completed status (false < true), then by createdAt as tiebreaker
+          if (a.completed === b.completed) {
+            comparison = new Date(a.createdAt) - new Date(b.createdAt);
+          } else {
+            comparison = a.completed ? 1 : -1;
+          }
+          break;
+        default:
+          // Fallback to createdAt
+          comparison = new Date(a.createdAt) - new Date(b.createdAt);
       }
-      // If timestamps are equal, sort by ID descending (newer IDs first)
-      return b.id - a.id;
+
+      // If values are still equal after primary sort, use ID as final tiebreaker for deterministic ordering
+      if (comparison === 0 && sortBy !== 'completed') {
+        comparison = a.id - b.id;
+      }
+
+      // Apply sort order (asc or desc)
+      return sortOrder === 'desc' ? -comparison : comparison;
     });
 
-    // If no pagination options provided, return all filtered tasks (backward compatibility)
+    // If no pagination options provided, return all filtered and sorted tasks (backward compatibility)
     if (!options.page && !options.limit) {
       return sorted;
     }

@@ -185,12 +185,14 @@ exports.validateTaskId = [
 ];
 
 /**
- * Validation rules for pagination and filtering query parameters
+ * Validation rules for pagination, filtering, and sorting query parameters
  *
  * Validates query parameters for GET /api/tasks:
  * - page: Optional, positive integer (>= 1), converted to integer
  * - limit: Optional, positive integer (1-100), converted to integer, max 100 items per page
  * - status: Optional, one of: 'all', 'completed', 'incomplete' (default: 'all')
+ * - sortBy: Optional, one of: 'createdAt', 'updatedAt', 'title', 'completed' (default: 'createdAt')
+ * - sortOrder: Optional, one of: 'asc', 'desc' (default: 'desc')
  *
  * All parameters are optional. If not provided, controller will use defaults.
  * Returns 400 with validation errors if any rule fails.
@@ -198,7 +200,7 @@ exports.validateTaskId = [
  * Security considerations:
  * - Enforces maximum limit of 100 to prevent resource exhaustion
  * - Validates positive integers to prevent injection attacks
- * - Whitelist approach for status values prevents injection
+ * - Whitelist approach for all enum values prevents injection
  *
  * @type {Array} Express middleware chain
  */
@@ -223,8 +225,28 @@ exports.validatePagination = [
     })
     .isIn(['all', 'completed', 'incomplete']).withMessage('Status must be one of: all, completed, incomplete'),
 
+  query('sortBy')
+    .optional()
+    .trim()
+    .customSanitizer(value => {
+      // Convert to lowercase for case-insensitive matching
+      const sanitized = value ? value.toLowerCase() : 'createdAt';
+      return sanitized;
+    })
+    .isIn(['createdat', 'updatedat', 'title', 'completed']).withMessage('sortBy must be one of: createdAt, updatedAt, title, completed'),
+
+  query('sortOrder')
+    .optional()
+    .trim()
+    .customSanitizer(value => {
+      // Convert to lowercase for case-insensitive matching
+      const sanitized = value ? value.toLowerCase() : 'desc';
+      return sanitized;
+    })
+    .isIn(['asc', 'desc']).withMessage('sortOrder must be one of: asc, desc'),
+
   /**
-   * Middleware to check pagination and filter validation results
+   * Middleware to check pagination, filter, and sort validation results
    * Returns 400 if query parameters are invalid
    * Sanitized values should be accessed via matchedData() in the controller
    */
