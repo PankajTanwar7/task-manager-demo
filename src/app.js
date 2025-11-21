@@ -20,6 +20,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const compression = require('compression');
 const taskRoutes = require('./routes/tasks');
 const healthRoutes = require('./routes/health');
 const helloRoutes = require('./routes/hello');
@@ -37,6 +38,18 @@ const app = express();
  * - And other security-related headers
  */
 app.use(helmet());
+
+/**
+ * Configure response compression
+ * - Compresses all responses larger than 1KB (1024 bytes)
+ * - Uses gzip/deflate compression
+ * - Compression level 6 balances speed and compression ratio
+ * - Reduces bandwidth usage by 60-90% for JSON responses
+ */
+app.use(compression({
+  threshold: 1024, // Only compress responses larger than 1KB
+  level: 6 // Compression level (0-9, where 6 is optimal for most cases)
+}));
 
 /**
  * Configure rate limiting to prevent API abuse
