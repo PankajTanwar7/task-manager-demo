@@ -140,12 +140,18 @@ if [ -n "$1" ]; then
     if [ -f "$HISTORY_FILE" ]; then
       log_debug "History file exists"
       if command -v jq &> /dev/null; then
+        # Validate prompt is for current issue (critical: prevents using stale prompts from other issues)
+        HISTORY_ISSUE=$(jq -r '.prompts[-1].issueNumber // ""' "$HISTORY_FILE" 2>/dev/null || echo "")
         HISTORY_PROMPT=$(jq -r '.prompts[-1].prompt // ""' "$HISTORY_FILE" 2>/dev/null || echo "")
-        if [ -n "$HISTORY_PROMPT" ]; then
+
+        if [ -n "$HISTORY_PROMPT" ] && [ "$HISTORY_ISSUE" = "$ISSUE_NUM" ]; then
           ACTUAL_PROMPT="$HISTORY_PROMPT"
           PROMPT_SOURCE="prompt-history"
-          log_debug "SUCCESS: Loaded from prompt history (${#ACTUAL_PROMPT} chars)"
+          log_debug "SUCCESS: Loaded from prompt history (${#ACTUAL_PROMPT} chars, issue $HISTORY_ISSUE)"
           echo "✓ Loaded prompt from history (fresh session capture)"
+        elif [ -n "$HISTORY_PROMPT" ] && [ "$HISTORY_ISSUE" != "$ISSUE_NUM" ]; then
+          log_debug "History prompt is for different issue ($HISTORY_ISSUE vs $ISSUE_NUM), skipping"
+          echo "⚠️  History has stale prompt from issue #${HISTORY_ISSUE}, skipping"
         else
           log_debug "History file empty or invalid"
         fi
