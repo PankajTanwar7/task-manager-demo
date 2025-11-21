@@ -147,7 +147,10 @@ ${ACHIEVEMENT}
   COVERAGE_SECTION=$(parse_coverage_section "$SESSION_FILE" "$COVERAGE_KEY" "$ISSUE_RESPONSE_NUM")
   [ -n "$COVERAGE_SECTION" ] && ISSUE_COMMENT="${ISSUE_COMMENT}${COVERAGE_SECTION}"
 
-  ISSUE_COMMENT="${ISSUE_COMMENT}### Files Changed in this Response
+  ISSUE_COMMENT="${ISSUE_COMMENT}
+---
+
+### Files Changed in this Response
 
 <details>
 <summary>${LATEST_FILE_COUNT} files</summary>
@@ -244,7 +247,10 @@ ${ACHIEVEMENT}
   COVERAGE_SECTION=$(parse_coverage_section "$SESSION_FILE" "$COVERAGE_KEY" "$PR_UPDATE_NUM")
   [ -n "$COVERAGE_SECTION" ] && PR_COMMENT="${PR_COMMENT}${COVERAGE_SECTION}"
 
-  PR_COMMENT="${PR_COMMENT}### Files Changed in this Update
+  PR_COMMENT="${PR_COMMENT}
+---
+
+### Files Changed in this Update
 
 <details>
 <summary>${LATEST_FILE_COUNT} files</summary>
