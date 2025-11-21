@@ -144,7 +144,7 @@ ${ACHIEVEMENT}
   ISSUE_COMMENT="${ISSUE_COMMENT}### Files Changed in this Branch
 
 <details>
-<summary>${FILE_COUNT} files modified</summary>
+<summary>Total: ${FILE_COUNT} files</summary>
 
 "
 
@@ -219,7 +219,7 @@ ${ACHIEVEMENT}
   PR_COMMENT="${PR_COMMENT}### Files Changed in this Branch
 
 <details>
-<summary>${FILE_COUNT} files changed</summary>
+<summary>Total: ${FILE_COUNT} files</summary>
 
 "
 
