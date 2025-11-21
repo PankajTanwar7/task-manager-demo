@@ -14,12 +14,35 @@
 #     "Achievement: Added docs to 9 files, 460+ lines, all tests passing"
 #
 # Format:
-#   - Issue comments: "💬 Response #N" (work-in-progress updates)
-#   - PR comments: "🔄 Update #N" (PR iteration updates)
+#   - Issue comments: "Response #N" (work-in-progress updates)
+#   - PR comments: "Update #N" (PR iteration updates)
+#
+# Posting Rules:
+#   - If PR exists: Posts to PR ONLY (PR takes precedence)
+#   - If no PR: Posts to Issue
+#   - Never posts to both Issue and PR simultaneously
 #
 # Enable/Disable:
 #   - To disable: export DISABLE_AUTO_COMMENT=true
 #   - To enable: unset DISABLE_AUTO_COMMENT (or export DISABLE_AUTO_COMMENT=false)
+#
+# Writing Good Summaries:
+#   See COMMENT-WRITING-GUIDE.md for detailed guidelines and examples
+#
+#   Quick Tips:
+#   - USER_PROMPT: Be specific, include context
+#   - ACHIEVEMENT: Use structured format with multiple paragraphs
+#     * Explain WHAT was done (specific changes)
+#     * Explain WHY it was done (reasoning, bugs fixed)
+#     * List files/functions modified
+#     * Mention testing done
+#     * Note acceptance criteria addressed
+#     * Include next steps if work continues
+#
+#   Bad Example:  "Fixed bug"
+#   Good Example: "Fixed coverage timestamp bug that caused stale detection.
+#                  Changed from commit-based to age-based check (24h window).
+#                  Modified parse-coverage.sh:54-61. Tested with npm test."
 ###############################################################################
 
 set -e
@@ -231,15 +254,17 @@ ${COMMITS}
 "
 fi
 
-# Post comments
-if [ -n "$ISSUE_NUM" ]; then
-  echo "$ISSUE_COMMENT" | gh issue comment "$ISSUE_NUM" --body-file - && \
-    echo "✓ Posted to Issue #${ISSUE_NUM} (Response #${ISSUE_RESPONSE_NUM})"
-fi
-
+# Post comments - PR takes precedence over Issue
+# Once a PR is created, all updates go to PR only (not both)
 if [ -n "$PR_NUM" ]; then
   echo "$PR_COMMENT" | gh pr comment "$PR_NUM" --body-file - && \
     echo "✓ Posted to PR #${PR_NUM} (Update #${PR_UPDATE_NUM})"
+elif [ -n "$ISSUE_NUM" ]; then
+  echo "$ISSUE_COMMENT" | gh issue comment "$ISSUE_NUM" --body-file - && \
+    echo "✓ Posted to Issue #${ISSUE_NUM} (Response #${ISSUE_RESPONSE_NUM})"
+else
+  echo "❌ No issue or PR found to post to"
+  exit 1
 fi
 
 echo "✅ Done!"

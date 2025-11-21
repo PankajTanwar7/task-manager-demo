@@ -365,6 +365,65 @@ export COVERAGE_THRESHOLD=70
 
 ---
 
+## Q13: How do I write good progress comments?
+
+**Answer:** Follow the guidelines in `COMMENT-WRITING-GUIDE.md` for detailed, well-structured comments.
+
+### Why Comment Quality Matters:
+- Documents your implementation progress
+- Helps reviewers understand what was done and why
+- Creates searchable history
+- Makes debugging easier later
+
+### Quick Guidelines:
+**Bad comment:** "Fixed bug"
+**Good comment:** "Fixed coverage timestamp bug. Changed from commit-based to age-based check (24h window). Modified parse-coverage.sh:54-61. Tested with npm test."
+
+### Key Elements of Good Comments:
+1. **Be specific** - Include file names, function names, line numbers
+2. **Use structure** - Paragraphs, headings, bullet points
+3. **Explain WHY** - Not just what changed, but reasoning
+4. **Show testing** - How you verified it works
+5. **Address criteria** - Reference acceptance criteria from issue
+
+### See Full Guide:
+Read `COMMENT-WRITING-GUIDE.md` for:
+- Complete examples (good vs bad)
+- Templates for different scenarios
+- Common mistakes to avoid
+- Quality checklist
+
+---
+
+## Q14: Does it post to both Issue and PR?
+
+**Answer:** No, PR takes precedence. Once a PR is created, comments go ONLY to the PR.
+
+### Workflow:
+**Before PR created:**
+```bash
+git checkout feature/10-my-feature
+./post-summary.sh "..." "..."
+# → Posts to Issue #10 only
+```
+
+**After PR created:**
+```bash
+gh pr create ...  # Creates PR #15
+./post-summary.sh "..." "..."
+# → Posts to PR #15 only (NOT Issue #10)
+```
+
+### Why This Design:
+- Prevents duplicate comments
+- Keeps conversation in one place
+- Issue shows: "Implementation complete, see PR #X"
+- All review iterations happen in PR
+
+**Key Point:** The script automatically detects if a PR exists and posts there instead of the Issue!
+
+---
+
 ## Summary
 
 | Question | Answer |
@@ -372,13 +431,15 @@ export COVERAGE_THRESHOLD=70
 | Which issue does it post to? | Current branch name (e.g., `feature/10-...` → Issue #10) |
 | Which PR does it post to? | PR that uses your current branch |
 | Can I disable it? | Yes: `export DISABLE_AUTO_COMMENT=true` |
-| Does it post to both Issue & PR? | Yes, if PR exists for the branch |
+| Does it post to both Issue & PR? | No - PR takes precedence over Issue |
 | How are numbers tracked? | `.claude/session-counter.json` |
 | Can I work on multiple issues? | Yes, switch branches |
 | Can I work on multiple PRs? | Yes, switch branches - same as issues |
 | How to enable coverage reporting? | Run `npm test -- --coverage` |
 | Why isn't coverage showing? | Check coverage file exists and is <24h old |
 | How to change coverage threshold? | Set `COVERAGE_THRESHOLD` env variable (default: 80) |
+| How to write good comments? | See `COMMENT-WRITING-GUIDE.md` for detailed guide |
+| When does it post to PR vs Issue? | PR only (if exists), otherwise Issue |
 
 ---
 
