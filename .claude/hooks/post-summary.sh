@@ -130,6 +130,7 @@ format_actual_prompt() {
 ${actual_prompt}
 
 ---
+
 "
   else
     # More than 3 lines, use collapsible details
@@ -143,6 +144,7 @@ ${actual_prompt}
 </details>
 
 ---
+
 "
   fi
 }
