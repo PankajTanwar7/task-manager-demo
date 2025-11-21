@@ -133,18 +133,35 @@ EOF
 
 **CRITICAL:** Always run after milestone commits!
 
+**Two Formats Available:**
+
+**Format 1: Standard (2 parameters) - Backward Compatible**
 ```bash
 ./.claude/hooks/post-summary.sh \
-  "What you asked Claude to do (specific, with context)" \
+  "What you asked Claude to do (formatted request)" \
   "What was achieved (detailed, structured)"
 ```
 
-**USER_PROMPT (Parameter 1):**
+**Format 2: With Actual Prompt (3 parameters) - NEW**
+```bash
+./.claude/hooks/post-summary.sh \
+  "raw user prompt exactly as typed" \
+  "Formatted request description with context" \
+  "What was achieved (detailed, structured)"
+```
+
+**ACTUAL_PROMPT (Parameter 1 - Optional):**
+- Raw, verbatim user input
+- Example: "add comments to all files"
+- Shows ≤3 lines: Displayed directly
+- Shows >3 lines: Collapsed with "View full prompt" button
+
+**USER_PROMPT (Parameter 2 in 3-param format, Parameter 1 in 2-param):**
 - ❌ Bad: "Implement pagination"
 - ✅ Good: "Implement pagination for GET /api/tasks endpoint (Issue #16)"
 - ✅ Better: "Fix critical bug in post-summary.sh preventing file list from appearing in GitHub comments"
 
-**ACHIEVEMENT (Parameter 2):**
+**ACHIEVEMENT (Parameter 3 in 3-param format, Parameter 2 in 2-param):**
 
 Must be detailed and structured. See template below.
 
@@ -236,9 +253,19 @@ Feature complete and ready for PR."
 The script automatically creates:
 
 ```markdown
-## ClaudeCode Response #N
+## ClaudeCode Response #N  (or "Update #N" for PRs)
 
 Time: YYYY-MM-DD HH:MM
+
+---
+
+### Actual Prompt  (optional - if 3-param format used)
+{RAW_USER_INPUT}
+  or
+<details>
+<summary>View full prompt (N lines)</summary>
+{LONG_RAW_INPUT}
+</details>
 
 ---
 
@@ -247,40 +274,58 @@ Time: YYYY-MM-DD HH:MM
 
 ---
 
-### Response
+### Response  (or "Changes Made" for PRs)
 {ACHIEVEMENT}
 
 ---
 
 ### Test Coverage (if available)
-[Coverage statistics]
+[Coverage statistics with file breakdown]
 
 ---
 
 ### Files Changed in this Response
-1 files
-- .claude/hooks/post-summary.sh
+<details>
+<summary>N files</summary>
+- file1.js
+- file2.js
+</details>
 
 ---
 
 ### All Files Changed in this Branch
-Total: 8 files
-- [all files listed]
+<details>
+<summary>Total: N files</summary>
+- [all files listed, max 15 shown]
+</details>
 
 ---
 
-### Commits in this Branch
-[All commits]
+### All Commits in this Branch
+[All commits with @mentions escaped]
 
 ---
 
-**Status:** Implementation completed and committed locally (not pushed yet)
+**Status:** Changes pushed to PR and ready for review
+
+---
+
+@claude review it  (automatically added to PR comments only)
 ```
+
+**Comment Structure Notes:**
+- **Actual Prompt**: Optional section showing verbatim user input
+  - ≤3 lines: Shown directly
+  - >3 lines: Collapsed for readability
+- **Request**: Formatted/contextualized description of the task
+- **Response/Changes Made**: What was accomplished
+- **@claude review it**: Automatically added to all PR update comments to trigger code review
 
 **Posting Logic:**
 - If PR exists → Posts to **PR ONLY** (PR takes precedence)
 - If no PR → Posts to **Issue**
 - Never posts to both simultaneously
+- PR comments automatically trigger @claude review
 
 ---
 
@@ -606,6 +651,25 @@ Your branch name doesn't match the pattern. Must be:
 
 Check: `git branch --show-current`
 
+### Issue: Multiple @claude reviews from one comment
+
+**Symptoms:**
+Single PR update comment triggers 2-3 @claude reviews instead of just one.
+
+**Root Cause:**
+Commit messages containing "@claude" (or other @mentions) trigger GitHub notifications.
+When the commit list is displayed in comments, each @mention triggers a review.
+
+**Solution:**
+The script automatically escapes @mentions in commit messages by adding a space:
+- `@claude` becomes `@ claude` (won't trigger notification)
+- Commit history remains readable
+- Only the final "@claude review it" triggers a review
+
+**Prevention:**
+Avoid using @mentions in commit messages. If you accidentally do, the script will
+automatically escape them when displaying the commit list.
+
 ---
 
 ## File Structure Reference
@@ -644,6 +708,8 @@ task-manager-demo/
 ✅ Reference specific files and line numbers in comments
 ✅ Explain WHY, not just WHAT
 ✅ Keep working tree clean
+✅ Use 3-parameter format for post-summary.sh when you have the raw user prompt
+✅ Let script auto-escape @mentions in commits (it does this automatically)
 
 ### DON'T:
 ❌ Skip testing before commits
@@ -653,6 +719,7 @@ task-manager-demo/
 ❌ Push before creating PR
 ❌ Commit .claude/session-counter.json or prompt logs
 ❌ Use vague commit messages
+❌ Use @mentions in commit messages (creates duplicate reviews if you do)
 
 ---
 
@@ -680,5 +747,9 @@ task-manager-demo/
 ---
 
 **Last Updated:** 2025-11-21
-**Version:** 1.0
+**Version:** 1.1
 **Maintainer:** This workflow is maintained and updated as improvements are discovered.
+
+**Version History:**
+- v1.1 (2025-11-21): Added Actual Prompt section, automatic @claude review, @mention escaping
+- v1.0 (2025-11-21): Initial comprehensive workflow documentation
