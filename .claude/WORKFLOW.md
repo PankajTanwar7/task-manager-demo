@@ -345,13 +345,15 @@ The PR description IS the summary. Update comments are ONLY for changes made AFT
 
 **Correct Workflow After PR Creation:**
 
-1. ✅ PR created with comprehensive description
-2. ✅ `@claude review it` triggers automatic review
+1. ✅ PR created with comprehensive description (includes "@claude review it" in description)
+2. ✅ Post initial comment to trigger review: `gh pr comment {PR_NUM} --body "@claude review it"`
 3. ⏳ Wait for @claude to post review comments
 4. 🔧 Make changes based on review feedback
 5. ✅ Commit changes
 6. ✅ Push changes
-7. ✅ **THEN** post ClaudeCode Update comment documenting what was fixed
+7. ✅ **THEN** post ClaudeCode Update comment (automatically includes "@claude review it")
+
+**Note:** GitHub @mentions work in comments, not PR descriptions. The initial "@claude review it" comment triggers the first review, and subsequent updates via post-summary.sh automatically trigger reviews.
 
 **Wrong Workflow:**
 1. ❌ Create PR
@@ -366,16 +368,22 @@ git add .
 git commit -m "fix: address review feedback..."
 git push
 
-# NOW post update comment
+# NOW post update comment (automatically triggers @claude review)
 ./.claude/hooks/post-summary.sh \
   "Address code review feedback from @claude" \
   "Fixed issues identified in review..."
 ```
 
+**Automatic @claude Review:**
+- Every PR update comment automatically includes "@claude review it"
+- This triggers automatic code review after each change
+- No need to manually mention @claude in comments
+
 **After PR created:**
 - Future change comments go to **PR only** (not Issue)
 - Use post-summary.sh only when pushing changes after review
 - Don't post immediately after PR creation
+- Each update automatically triggers @claude review
 
 ---
 
