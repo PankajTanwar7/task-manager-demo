@@ -89,6 +89,12 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
+            **IMPORTANT - REVIEW ONLY MODE**
+            You are in REVIEW-ONLY mode. Do NOT make any code changes, create commits, or modify files.
+            Your role is to analyze and provide feedback ONLY.
+
+            ---
+
             REPOSITORY: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
             AUTHOR: @${{ github.event.pull_request.user.login }}
