@@ -6,10 +6,6 @@
           {
             "type": "command",
             "command": ".claude/hooks/user-prompt-submit-enhanced.sh"
-          },
-          {
-            "type": "command",
-            "command": ".claude/hooks/simple-test-hook.sh"
           }
         ]
       }
@@ -23,10 +19,6 @@
           {
             "type": "command",
             "command": ".claude/hooks/post-tool-use.sh"
-          },
-          {
-            "type": "command",
-            "command": ".claude/hooks/simple-test-hook.sh"
           }
         ]
       }
