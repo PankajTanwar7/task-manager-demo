@@ -243,3 +243,45 @@ exports.deleteTask = (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * Get task statistics
+ *
+ * Returns aggregated statistics about all tasks including:
+ * - Total counts (all, completed, incomplete)
+ * - Completion rate percentage (formatted as "XX.XX%")
+ * - Recent activity counts (last 7 days = 168 hours)
+ *
+ * No authentication required (consistent with other endpoints).
+ * No query parameters - returns single statistics object.
+ *
+ * Response format:
+ * {
+ *   success: true,
+ *   data: {
+ *     total: 50,
+ *     completed: 30,
+ *     incomplete: 20,
+ *     completionRate: "60.00%",
+ *     recentlyCompleted: 5,
+ *     recentlyCreated: 8
+ *   }
+ * }
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ * @returns {void} Sends 200 JSON response with task statistics
+ */
+exports.getStats = (req, res, next) => {
+  try {
+    const stats = Task.getStats();
+
+    res.status(200).json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    next(error);
+  }
+};

@@ -40,6 +40,13 @@ router.post('/', validateCreateTask, taskController.createTask);
 router.get('/', validatePagination, taskController.getAllTasks);
 
 /**
+ * GET /api/tasks/stats - Get task statistics
+ * Returns aggregated statistics about all tasks
+ * IMPORTANT: Must be registered BEFORE /:id route to avoid routing conflicts
+ */
+router.get('/stats', taskController.getStats);
+
+/**
  * GET /api/tasks/:id - Get a single task
  * Validates ID parameter before lookup
  */

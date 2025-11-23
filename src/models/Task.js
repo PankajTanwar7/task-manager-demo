@@ -150,6 +150,63 @@ class Task {
     tasks = [];
     nextId = 1;
   }
+
+  /**
+   * Calculate task statistics in a single pass.
+   *
+   * Returns aggregated metrics about all tasks including:
+   * - Total counts (all, completed, incomplete)
+   * - Completion rate percentage
+   * - Recent activity (last 7 days)
+   *
+   * Thread-safety: Safe in Node.js due to single-threaded event loop.
+   * No task modifications can occur during iteration.
+   *
+   * Note: If migrating to multi-threaded environment or database,
+   * ensure atomic read of task list (e.g., transaction, mutex, snapshot).
+   *
+   * @returns {Object} Statistics object with task metrics
+   */
+  static getStats() {
+    const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    // Single-pass iteration for O(n) performance
+    const stats = tasks.reduce((acc, task) => {
+      acc.total++;
+
+      if (task.completed) {
+        acc.completed++;
+        // Use completedAt timestamp (not updatedAt) for recently completed
+        if (task.completedAt && new Date(task.completedAt) >= sevenDaysAgo) {
+          acc.recentlyCompleted++;
+        }
+      } else {
+        acc.incomplete++;
+      }
+
+      // Use createdAt timestamp for recently created
+      if (new Date(task.createdAt) >= sevenDaysAgo) {
+        acc.recentlyCreated++;
+      }
+
+      return acc;
+    }, {
+      total: 0,
+      completed: 0,
+      incomplete: 0,
+      recentlyCompleted: 0,
+      recentlyCreated: 0
+    });
+
+    // Format completion rate with 2 decimal places
+    // Handle division by zero: 0 total tasks returns "0.00%"
+    stats.completionRate = stats.total === 0
+      ? '0.00%'
+      : `${((stats.completed / stats.total) * 100).toFixed(2)}%`;
+
+    return stats;
+  }
 }
 
 module.exports = Task;

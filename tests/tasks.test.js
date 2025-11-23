@@ -1194,4 +1194,299 @@ describe('Task API Endpoints', () => {
       expect(res.body.data[0].description).toBe('Updated description');
     });
   });
+
+  describe('GET /api/tasks/stats', () => {
+    /**
+     * Test basic stats endpoint functionality
+     * Verifies: 200 status, success flag, all required fields in response
+     */
+    it('should return 200 with correct response structure', async () => {
+      const res = await request(app)
+        .get('/api/tasks/stats')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveProperty('total');
+      expect(res.body.data).toHaveProperty('completed');
+      expect(res.body.data).toHaveProperty('incomplete');
+      expect(res.body.data).toHaveProperty('completionRate');
+      expect(res.body.data).toHaveProperty('recentlyCompleted');
+      expect(res.body.data).toHaveProperty('recentlyCreated');
+    });
+
+    /**
+     * Test empty task list handling
+     * Verifies: All counts are 0, completion rate is "0.00%" (no division by zero error)
+     */
+    it('should handle empty task list (0 tasks)', async () => {
+      const res = await request(app)
+        .get('/api/tasks/stats')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.total).toBe(0);
+      expect(res.body.data.completed).toBe(0);
+      expect(res.body.data.incomplete).toBe(0);
+      expect(res.body.data.completionRate).toBe('0.00%');
+      expect(res.body.data.recentlyCompleted).toBe(0);
+      expect(res.body.data.recentlyCreated).toBe(0);
+    });
+
+    /**
+     * Test total count calculation
+     * Verifies: Total equals sum of completed + incomplete
+     */
+    it('should return correct total count', async () => {
+      // Create 5 tasks
+      await request(app).post('/api/tasks').send({ title: 'Task 1' });
+      await request(app).post('/api/tasks').send({ title: 'Task 2' });
+      await request(app).post('/api/tasks').send({ title: 'Task 3' });
+      await request(app).post('/api/tasks').send({ title: 'Task 4' });
+      await request(app).post('/api/tasks').send({ title: 'Task 5' });
+
+      const res = await request(app)
+        .get('/api/tasks/stats')
+        .expect(200);
+
+      expect(res.body.data.total).toBe(5);
+    });
+
+    /**
+     * Test completed and incomplete count calculation
+     * Verifies: Counts are accurate and total = completed + incomplete
+     */
+    it('should return correct completed/incomplete counts', async () => {
+      // Create 5 tasks
+      const task1 = await request(app).post('/api/tasks').send({ title: 'Task 1' });
+      const task2 = await request(app).post('/api/tasks').send({ title: 'Task 2' });
+      const task3 = await request(app).post('/api/tasks').send({ title: 'Task 3' });
+      await request(app).post('/api/tasks').send({ title: 'Task 4' });
+      await request(app).post('/api/tasks').send({ title: 'Task 5' });
+
+      // Mark 3 as completed
+      await request(app)
+        .put(`/api/tasks/${task1.body.data.id}`)
+        .send({ completed: true });
+      await request(app)
+        .put(`/api/tasks/${task2.body.data.id}`)
+        .send({ completed: true });
+      await request(app)
+        .put(`/api/tasks/${task3.body.data.id}`)
+        .send({ completed: true });
+
+      const res = await request(app)
+        .get('/api/tasks/stats')
+        .expect(200);
+
+      expect(res.body.data.total).toBe(5);
+      expect(res.body.data.completed).toBe(3);
+      expect(res.body.data.incomplete).toBe(2);
+    });
+
+    /**
+     * Test completion rate calculation
+     * Verifies: Percentage is calculated correctly
+     */
+    it('should calculate completion rate correctly', async () => {
+      // Create 5 tasks
+      const task1 = await request(app).post('/api/tasks').send({ title: 'Task 1' });
+      const task2 = await request(app).post('/api/tasks').send({ title: 'Task 2' });
+      const task3 = await request(app).post('/api/tasks').send({ title: 'Task 3' });
+      await request(app).post('/api/tasks').send({ title: 'Task 4' });
+      await request(app).post('/api/tasks').send({ title: 'Task 5' });
+
+      // Mark 3 as completed (3/5 = 60%)
+      await request(app)
+        .put(`/api/tasks/${task1.body.data.id}`)
+        .send({ completed: true });
+      await request(app)
+        .put(`/api/tasks/${task2.body.data.id}`)
+        .send({ completed: true });
+      await request(app)
+        .put(`/api/tasks/${task3.body.data.id}`)
+        .send({ completed: true });
+
+      const res = await request(app)
+        .get('/api/tasks/stats')
+        .expect(200);
+
+      expect(res.body.data.completionRate).toBe('60.00%');
+    });
+
+    /**
+     * Test completion rate formatting
+     * Verifies: Always formatted with 2 decimal places
+     */
+    it('should format completion rate with 2 decimal places', async () => {
+      // Create 3 tasks
+      const task1 = await request(app).post('/api/tasks').send({ title: 'Task 1' });
+      await request(app).post('/api/tasks').send({ title: 'Task 2' });
+      await request(app).post('/api/tasks').send({ title: 'Task 3' });
+
+      // Mark 1 as completed (1/3 = 33.333...%)
+      await request(app)
+        .put(`/api/tasks/${task1.body.data.id}`)
+        .send({ completed: true });
+
+      const res = await request(app)
+        .get('/api/tasks/stats')
+        .expect(200);
+
+      expect(res.body.data.completionRate).toBe('33.33%');
+    });
+
+    /**
+     * Test all incomplete tasks scenario
+     * Verifies: 0% completion rate when no tasks are completed
+     */
+    it('should handle all incomplete tasks (0% completion)', async () => {
+      // Create 3 incomplete tasks
+      await request(app).post('/api/tasks').send({ title: 'Task 1' });
+      await request(app).post('/api/tasks').send({ title: 'Task 2' });
+      await request(app).post('/api/tasks').send({ title: 'Task 3' });
+
+      const res = await request(app)
+        .get('/api/tasks/stats')
+        .expect(200);
+
+      expect(res.body.data.total).toBe(3);
+      expect(res.body.data.completed).toBe(0);
+      expect(res.body.data.incomplete).toBe(3);
+      expect(res.body.data.completionRate).toBe('0.00%');
+    });
+
+    /**
+     * Test all completed tasks scenario
+     * Verifies: 100% completion rate when all tasks are completed
+     */
+    it('should handle all completed tasks (100% completion)', async () => {
+      // Create 3 tasks and complete all
+      const task1 = await request(app).post('/api/tasks').send({ title: 'Task 1' });
+      const task2 = await request(app).post('/api/tasks').send({ title: 'Task 2' });
+      const task3 = await request(app).post('/api/tasks').send({ title: 'Task 3' });
+
+      await request(app)
+        .put(`/api/tasks/${task1.body.data.id}`)
+        .send({ completed: true });
+      await request(app)
+        .put(`/api/tasks/${task2.body.data.id}`)
+        .send({ completed: true });
+      await request(app)
+        .put(`/api/tasks/${task3.body.data.id}`)
+        .send({ completed: true });
+
+      const res = await request(app)
+        .get('/api/tasks/stats')
+        .expect(200);
+
+      expect(res.body.data.total).toBe(3);
+      expect(res.body.data.completed).toBe(3);
+      expect(res.body.data.incomplete).toBe(0);
+      expect(res.body.data.completionRate).toBe('100.00%');
+    });
+
+    /**
+     * Test recently created count (last 7 days)
+     * Verifies: Only tasks created within last 168 hours are counted
+     */
+    it('should count recently created tasks (last 7 days)', async () => {
+      // Create tasks with different creation dates
+      const now = new Date();
+
+      // Task created just now (should count)
+      await request(app).post('/api/tasks').send({ title: 'Recent Task 1' });
+
+      // Task created 3 days ago (should count)
+      const task2 = await request(app).post('/api/tasks').send({ title: 'Recent Task 2' });
+      const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+      Task.findById(task2.body.data.id).createdAt = threeDaysAgo.toISOString();
+
+      // Task created 6 days ago (should count)
+      const task3 = await request(app).post('/api/tasks').send({ title: 'Recent Task 3' });
+      const sixDaysAgo = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
+      Task.findById(task3.body.data.id).createdAt = sixDaysAgo.toISOString();
+
+      // Task created 8 days ago (should NOT count)
+      const task4 = await request(app).post('/api/tasks').send({ title: 'Old Task' });
+      const eightDaysAgo = new Date(now.getTime() - 8 * 24 * 60 * 60 * 1000);
+      Task.findById(task4.body.data.id).createdAt = eightDaysAgo.toISOString();
+
+      const res = await request(app)
+        .get('/api/tasks/stats')
+        .expect(200);
+
+      expect(res.body.data.total).toBe(4);
+      expect(res.body.data.recentlyCreated).toBe(3); // Only first 3 tasks
+    });
+
+    /**
+     * Test recently completed count (last 7 days)
+     * Verifies: Only tasks completed within last 168 hours are counted
+     */
+    it('should count recently completed tasks (last 7 days)', async () => {
+      // Create tasks and complete them at different times
+      const now = new Date();
+
+      // Task completed just now (should count)
+      const task1 = await request(app).post('/api/tasks').send({ title: 'Task 1' });
+      await request(app)
+        .put(`/api/tasks/${task1.body.data.id}`)
+        .send({ completed: true });
+
+      // Task completed 5 days ago (should count)
+      const task2 = await request(app).post('/api/tasks').send({ title: 'Task 2' });
+      await request(app)
+        .put(`/api/tasks/${task2.body.data.id}`)
+        .send({ completed: true });
+      const fiveDaysAgo = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
+      Task.findById(task2.body.data.id).completedAt = fiveDaysAgo.toISOString();
+
+      // Task completed 10 days ago (should NOT count)
+      const task3 = await request(app).post('/api/tasks').send({ title: 'Task 3' });
+      await request(app)
+        .put(`/api/tasks/${task3.body.data.id}`)
+        .send({ completed: true });
+      const tenDaysAgo = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000);
+      Task.findById(task3.body.data.id).completedAt = tenDaysAgo.toISOString();
+
+      // Incomplete task (should NOT count)
+      await request(app).post('/api/tasks').send({ title: 'Task 4' });
+
+      const res = await request(app)
+        .get('/api/tasks/stats')
+        .expect(200);
+
+      expect(res.body.data.total).toBe(4);
+      expect(res.body.data.completed).toBe(3);
+      expect(res.body.data.recentlyCompleted).toBe(2); // Only first 2 completed tasks
+    });
+
+    /**
+     * Test that recently completed uses completedAt, not updatedAt
+     * Verifies: Tasks completed long ago but updated recently are not counted as recently completed
+     */
+    it('should use completedAt (not updatedAt) for recently completed count', async () => {
+      const now = new Date();
+
+      // Task completed 10 days ago
+      const task1 = await request(app).post('/api/tasks').send({ title: 'Old Completed Task' });
+      await request(app)
+        .put(`/api/tasks/${task1.body.data.id}`)
+        .send({ completed: true });
+      const tenDaysAgo = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000);
+      Task.findById(task1.body.data.id).completedAt = tenDaysAgo.toISOString();
+
+      // Update the task today (changes updatedAt but not completedAt)
+      await request(app)
+        .put(`/api/tasks/${task1.body.data.id}`)
+        .send({ title: 'Updated Title' });
+
+      const res = await request(app)
+        .get('/api/tasks/stats')
+        .expect(200);
+
+      expect(res.body.data.completed).toBe(1);
+      expect(res.body.data.recentlyCompleted).toBe(0); // Should NOT count because completedAt is 10 days ago
+    });
+  });
 });
