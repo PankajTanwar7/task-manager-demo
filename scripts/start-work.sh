@@ -130,10 +130,16 @@ create_branch() {
 extract_claude_context() {
     print_header "Extracting Context from Issue"
 
-    # Extract sections from issue body
-    architecture=$(echo "$issue_body" | sed -n '/## 🏗️ Architecture Discussion/,/## 📁 Affected Files/p' | sed '1d;$d')
-    affected_files=$(echo "$issue_body" | sed -n '/## 📁 Affected Files/,/## 🔗 Related Issues/p' | sed '1d;$d')
-    acceptance_criteria=$(echo "$issue_body" | sed -n '/## 🎯 Acceptance Criteria/,/## 🏗️ Architecture/p' | sed '1d;$d')
+    # Extract sections from issue body (if they exist)
+    # Look for structured sections, but don't require them
+    acceptance_criteria=$(echo "$issue_body" | sed -n '/## 🎯 Acceptance Criteria/,/##/p' | sed '1d;$d')
+    architecture=$(echo "$issue_body" | sed -n '/## 🏗️ Architecture Discussion/,/##/p' | sed '1d;$d')
+
+    # If no structured sections found, use entire issue body
+    if [ -z "$acceptance_criteria" ] && [ -z "$architecture" ]; then
+        print_info "No structured sections found - using full issue description"
+        full_description="$issue_body"
+    fi
 
     # Count @claude responses in issue comments
     claude_responses=$(gh issue view "$1" --comments --json comments | jq -r '.comments[] | select(.author.login == "claude") | .body' 2>/dev/null || echo "")
@@ -153,10 +159,13 @@ generate_prompt() {
     # Create prompt file
     prompt_file=".claude-prompt-issue-${issue_num}.md"
 
-    cat > "$prompt_file" << EOF
+    # Build prompt based on what we found
+    if [ -n "$full_description" ]; then
+        # Simple format: just use the issue description
+        cat > "$prompt_file" << EOF
 # Claude Code Prompt - Issue #${issue_num}
 
-## Context from GitHub Issue
+## Issue Details
 
 **Issue:** #${issue_num} - ${issue_title}
 **Type:** ${issue_type}
@@ -164,39 +173,80 @@ generate_prompt() {
 
 ---
 
-## Acceptance Criteria
-${acceptance_criteria}
+## Description
 
----
-
-## Architecture/Solution (from @claude discussion)
-${architecture}
+${full_description}
 
 ${claude_responses:+
-## @claude Recommendations
+---
+
+## @claude Discussion from Issue Comments
+
 ${claude_responses}
 }
 
 ---
 
-## Files to Modify
-${affected_files}
+## Your Task
+
+Please implement this ${issue_type} according to the description above.
+
+**Requirements:**
+1. Read the codebase to understand current architecture
+2. Implement the requested functionality
+3. Write/update tests as needed
+4. Ensure all tests pass
+5. Commit with proper message: "${issue_type}: <description> (#${issue_num})"
+EOF
+    else
+        # Structured format: use sections
+        cat > "$prompt_file" << EOF
+# Claude Code Prompt - Issue #${issue_num}
+
+## Issue Details
+
+**Issue:** #${issue_num} - ${issue_title}
+**Type:** ${issue_type}
+**Branch:** ${branch_name}
 
 ---
+
+${acceptance_criteria:+
+## Acceptance Criteria
+
+${acceptance_criteria}
+
+---
+}
+
+${architecture:+
+## Architecture/Solution
+
+${architecture}
+
+---
+}
+
+${claude_responses:+
+## @claude Discussion from Issue Comments
+
+${claude_responses}
+
+---
+}
 
 ## Your Task
 
 Please implement this ${issue_type} according to the specifications above.
 
 **Requirements:**
-1. Follow the architecture discussed in the issue
+1. Read the codebase to understand current architecture
 2. Implement all acceptance criteria
-3. Write/update tests
-4. Ensure existing tests pass
+3. Write/update tests as needed
+4. Ensure all tests pass
 5. Commit with proper message: "${issue_type}: <description> (#${issue_num})"
-
-**Note:** This session will be auto-logged to docs/dev-logs/issue-${issue_num}.md
 EOF
+    fi
 
     print_success "Prompt file created: ${prompt_file}"
     print_info "You can copy this prompt or reference it in Claude Code"
@@ -250,14 +300,21 @@ display_next_steps() {
     echo ""
     echo "1. Start Claude Code in this directory"
     echo "2. Copy the prompt above (or from: .claude-prompt-issue-${1}.md)"
-    echo "3. Start implementing!"
+    echo "3. Paste prompt to Claude and let it implement"
     echo ""
-    echo -e "${BLUE}Your changes will be auto-logged to: docs/dev-logs/issue-${1}.md${NC}"
+    echo -e "${BLUE}Claude's workflow:${NC}"
+    echo "  1. Implement changes and commit locally"
+    echo "  2. Run: ./.claude/hooks/post-summary.sh \"your request\" \"what was achieved\""
+    echo "     → Posts comment to Issue #${1}"
+    echo "  3. (Optional) Repeat steps 1-2 for additional changes"
+    echo "  4. Ask you: \"Ready to push and create PR?\""
+    echo "  5. After your approval: push + create PR + post summary"
+    echo "     → Posts to both Issue #${1} and the new PR"
     echo ""
-    echo -e "${YELLOW}When done:${NC}"
-    echo "  - Review changes: git diff"
-    echo "  - Create PR: gh pr create --fill"
-    echo "  - PR merge will auto-close issue #${1}"
+    echo -e "${YELLOW}Remember:${NC}"
+    echo "  - Claude commits locally first (not pushed)"
+    echo "  - You control when to push/create PR"
+    echo "  - PR will auto-close issue #${1} when merged (uses 'Fixes #${1}')"
     echo ""
 }
 
